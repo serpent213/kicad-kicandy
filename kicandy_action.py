@@ -10,7 +10,7 @@ from kipy.board_types import BoardLayer, BoardText
 from kipy.geometry import Vector2
 
 from icon_fonts import ICON_FONTS
-from icon_repository import IconDownloadError, IconGlyph, IconRepository
+from icon_repository import IconDownloadError, IconGlyph, IconRepository, resolve_cache_dir
 from state_store import PluginState
 from ui.icon_picker_dialog import IconListRow, IconPickerDialog
 
@@ -23,7 +23,7 @@ LAYER_CHOICES = [
     ("Back Silkscreen (B.SilkS)", BoardLayer.BL_B_SilkS),
 ]
 
-STATE_PATH = Path(__file__).with_name("kicandy_state.json")
+STATE_PATH = resolve_cache_dir() / "kicandy_state.json"
 PROFILE_TXT_OUTPUT_PATH = Path("/tmp/kicandy_profile.txt")
 PROFILE_HTML_OUTPUT_PATH = Path("/tmp/kicandy_profile.html")
 _WX_APP: wx.App | None = None

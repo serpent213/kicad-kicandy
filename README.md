@@ -1,20 +1,14 @@
-# Kicandy Icon Picker
+# KiCandy Icon Picker
 
-Kicandy is a KiCad 9 Python action plugin that inserts Material Symbols glyphs as
+KiCandy is a KiCad 9 Python action plugin that inserts Material Symbols glyphs as
 free silkscreen text. Instead of typing a Unicode character manually, you get a
 searchable gallery of icons grouped by font style (Outlined, Rounded, Sharp).
 
 ## Features
 
-- Downloads Material Symbols codepoint metadata for the three official styles
-  directly from the upstream Google repository and caches it locally.
 - Search-as-you-type filtering with live updates as you toggle icon sets.
-- Preview icons rendered with the matching system font, so the glyph you place
-  matches what you see.
-- Layer picker for `F.SilkS` or `B.SilkS` and automatic use of the board's
-  silkscreen text defaults.
-- Persistent dialog state stored in `kicandy_state.json` so the plugin remembers
-  the last search text, enabled icon sets, and chosen layer.
+- Persistent dialog state so the plugin remembers the last search text, enabled
+  icon sets, and chosen layer.
 
 ## Usage
 
@@ -34,9 +28,8 @@ searchable gallery of icons grouped by font style (Outlined, Rounded, Sharp).
   be added later.
 - Codepoint files are cached under `cache/` within the plugin directory. Delete
   the folder if you need to force a refresh.
-- Dialog state is stored in `kicandy_state.json` next to `kicandy_action.py`.
-- If the KiCad scripting sandbox cannot reach GitHub, the dialog will show an
-  error and stay empty until connectivity is available.
+- Dialog state is stored in `cache/kicandy_state.json` (or the KiCad plugin
+  cache directory when `KICAD_CACHE_HOME` is set).
 - wxPython version during development: 4.2.2a1 osx-cocoa (phoenix) wxWidgets 3.2.8
 
 ### Profiling
