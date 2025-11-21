@@ -1,0 +1,22 @@
+{
+    "$schema": "https://go.kicad.org/api/schemas/v1",
+    "identifier": "org.kicandy.iconpicker",
+    "name": "Kicandy Icon Picker",
+    "description": "Insert Material Symbols glyphs as silkscreen text",
+    "runtime": {
+        "type": "python",
+        "min_version": "3.9"
+    },
+    "actions": [
+        {
+            "identifier": "kicandy-insert-icon",
+            "name": "Insert Icon Text",
+            "description": "Pick a Material icon and add it as silkscreen text",
+            "show-button": true,
+            "scopes": [
+                "pcb"
+            ],
+            "entrypoint": "kicandy_action.py"
+        }
+    ]
+}
