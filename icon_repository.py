@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import ssl
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
@@ -40,8 +41,21 @@ class IconRepository:
     def __init__(
         self, cache_dir: Path | None = None, fonts: Sequence[IconFont] | None = None
     ) -> None:
-        self.cache_dir = cache_dir or Path(__file__).parent / "cache"
-        self.cache_dir.mkdir(parents=True, exist_ok=True)
+        if cache_dir is None:
+            cache_home = os.environ.get("KICAD_CACHE_HOME")
+            if cache_home:
+                plugin_env_dir = Path(cache_home) / "python-environments" / "de.reactor.kicandy"
+                if not plugin_env_dir.exists():
+                    raise IconRepositoryError(
+                        f"Missing KiCad plugin cache directory: {plugin_env_dir}"
+                    )
+                resolved_cache_dir = plugin_env_dir / "local"
+            else:
+                resolved_cache_dir = Path(__file__).parent / "cache"
+        else:
+            resolved_cache_dir = Path(cache_dir)
+        resolved_cache_dir.mkdir(parents=True, exist_ok=True)
+        self.cache_dir = resolved_cache_dir
         self.fonts = {font.identifier: font for font in (fonts or ICON_FONTS)}
         self._glyph_cache: dict[str, list[IconGlyph]] = {}
 

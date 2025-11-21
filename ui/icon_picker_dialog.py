@@ -255,7 +255,7 @@ class IconPickerDialog(wx.Dialog):
     ) -> None:
         super().__init__(
             parent,
-            title="Kicandy Icon Picker",
+            title="KiCandy Icon Picker",
             style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER,
         )
 
