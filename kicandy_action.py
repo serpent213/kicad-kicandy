@@ -120,6 +120,7 @@ class KicandyDialog(IconPickerDialog):
         text.position = Vector2.from_xy_mm(0.0, 0.0)
         defaults = self.board.get_graphics_defaults()[BoardLayerClass.BLC_SILKSCREEN]
         text.attributes = defaults.text
+        text.attributes.font_name = glyph.font_family
 
         created = self.board.create_items(text)
         if created:

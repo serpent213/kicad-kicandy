@@ -40,6 +40,7 @@ class IconPickerDialog(wx.Dialog):
 
     def _build_ui(self) -> None:
         self.SetSizeHints(wx.Size(600, 480))
+        self.SetSize(wx.Size(800, 600))
         root_sizer = wx.BoxSizer(wx.VERTICAL)
 
         # Search controls
@@ -81,7 +82,7 @@ class IconPickerDialog(wx.Dialog):
 
         # Buttons
         button_row = wx.StdDialogButtonSizer()
-        self.add_button = wx.Button(self, label="Add Icon")
+        self.add_button = wx.Button(self, id=wx.ID_OK)
         self.cancel_button = wx.Button(self, id=wx.ID_CANCEL)
         self.add_button.Disable()
         button_row.AddButton(self.add_button)
@@ -188,9 +189,9 @@ class IconPickerDialog(wx.Dialog):
             self.icon_list.InsertItem(idx, row.glyph)
             self.icon_list.SetItem(idx, 1, row.name)
             self.icon_list.SetItem(idx, 2, row.font_label)
-            font = self._get_font_for_family(row.font_family)
-            if font is not None:
-                self.icon_list.SetItemFont(idx, font)
+            # font = self._get_font_for_family(row.font_family)
+            # if font is not None:
+            #     self.icon_list.SetItemFont(idx, font)
         self._update_add_button_state()
         self.set_status(f"Showing {len(self._rows)} icons")
 
@@ -202,6 +203,6 @@ class IconPickerDialog(wx.Dialog):
 
     def _get_font_for_family(self, family: str) -> wx.Font | None:
         if family not in self._font_render_map:
-            info = wx.FontInfo(24).Family(wx.FONTFAMILY_DEFAULT).FaceName(family)
+            info = wx.FontInfo(24).FaceName(family)
             self._font_render_map[family] = wx.Font(info)
         return self._font_render_map[family]
