@@ -31,8 +31,9 @@ class IconPickerDialog(wx.Dialog):
         self.fonts = list(fonts)
         self.layers = list(layers)
         self._font_checkboxes: dict[str, wx.CheckBox] = {}
-        self._font_render_map: dict[str, wx.Font] = {}
+        self._font_render_map: dict[tuple[str, int], wx.Font] = {}
         self._rows: list[IconListRow] = []
+        self._default_preview_font = wx.Font(wx.FontInfo(96))
 
         self._build_ui()
         self._populate_fonts()
@@ -58,7 +59,9 @@ class IconPickerDialog(wx.Dialog):
         font_sizer.Add(self.font_grid, 1, wx.ALL | wx.EXPAND, 5)
         root_sizer.Add(font_sizer, 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 5)
 
-        # Icon list
+        # Icon list + preview panel
+        content_sizer = wx.BoxSizer(wx.HORIZONTAL)
+
         self.icon_list = wx.ListCtrl(
             self,
             style=wx.LC_REPORT | wx.LC_SINGLE_SEL | wx.LC_HRULES | wx.LC_VRULES,
@@ -66,7 +69,32 @@ class IconPickerDialog(wx.Dialog):
         self.icon_list.InsertColumn(0, "Icon", width=100)
         self.icon_list.InsertColumn(1, "Name", width=300)
         self.icon_list.InsertColumn(2, "Font", width=160)
-        root_sizer.Add(self.icon_list, 1, wx.EXPAND | wx.ALL, 5)
+        content_sizer.Add(self.icon_list, 2, wx.EXPAND | wx.ALL, 5)
+
+        preview_box = wx.StaticBox(self, label="Preview")
+        preview_sizer = wx.StaticBoxSizer(preview_box, wx.VERTICAL)
+        preview_content = wx.BoxSizer(wx.VERTICAL)
+        preview_content.AddStretchSpacer()
+
+        self.preview_glyph = wx.StaticText(
+            preview_box,
+            label="",
+            style=wx.ALIGN_CENTER_HORIZONTAL,
+        )
+        self.preview_glyph.SetFont(self._default_preview_font)
+        preview_content.Add(self.preview_glyph, 0, wx.ALIGN_CENTER_HORIZONTAL | wx.BOTTOM, 10)
+
+        self.preview_caption = wx.StaticText(
+            preview_box,
+            label="Select an icon",
+            style=wx.ALIGN_CENTER_HORIZONTAL,
+        )
+        preview_content.Add(self.preview_caption, 0, wx.ALIGN_CENTER_HORIZONTAL)
+        preview_content.AddStretchSpacer()
+
+        preview_sizer.Add(preview_content, 1, wx.EXPAND | wx.ALL, 10)
+        content_sizer.Add(preview_sizer, 1, wx.EXPAND | wx.ALL, 5)
+        root_sizer.Add(content_sizer, 1, wx.EXPAND)
 
         # Status + layer selection
         status_row = wx.BoxSizer(wx.HORIZONTAL)
@@ -82,7 +110,7 @@ class IconPickerDialog(wx.Dialog):
 
         # Buttons
         button_row = wx.StdDialogButtonSizer()
-        self.add_button = wx.Button(self, id=wx.ID_OK)
+        self.add_button = wx.Button(self, id=wx.ID_OK, label="Add Icon")
         self.cancel_button = wx.Button(self, id=wx.ID_CANCEL)
         self.add_button.Disable()
         button_row.AddButton(self.add_button)
@@ -96,8 +124,8 @@ class IconPickerDialog(wx.Dialog):
         # Event wiring
         self.search_ctrl.Bind(wx.EVT_TEXT, self._handle_search)
         self.search_ctrl.Bind(wx.EVT_TEXT_ENTER, self._handle_search)
-        self.icon_list.Bind(wx.EVT_LIST_ITEM_SELECTED, self._update_add_button_state)
-        self.icon_list.Bind(wx.EVT_LIST_ITEM_DESELECTED, self._update_add_button_state)
+        self.icon_list.Bind(wx.EVT_LIST_ITEM_SELECTED, self._update_icon_activated)
+        self.icon_list.Bind(wx.EVT_LIST_ITEM_DESELECTED, self._update_icon_activated)
         self.icon_list.Bind(wx.EVT_LIST_ITEM_ACTIVATED, self._handle_icon_activated)
         self.add_button.Bind(wx.EVT_BUTTON, self._handle_add)
         self.Bind(wx.EVT_CLOSE, self._handle_close)
@@ -132,8 +160,25 @@ class IconPickerDialog(wx.Dialog):
         self.on_close_requested()
         event.Skip()
 
-    def _update_add_button_state(self, _: wx.ListEvent | None = None) -> None:
+    def _update_icon_activated(self, _: wx.ListEvent | None = None) -> None:
         self.add_button.Enable(self.icon_list.GetFirstSelected() != -1)
+        self._update_preview(self.get_selected_row())
+
+    def _update_preview(self, row: IconListRow | None) -> None:
+        if row is None:
+            self.preview_glyph.SetFont(self._default_preview_font)
+            self.preview_glyph.SetLabel("")
+            self.preview_caption.SetLabel("Select an icon to preview")
+            self._refresh_preview_layout()
+            return
+
+        preview_font = self._get_font_for_family(row.font_family, 120)
+        if preview_font is None:
+            preview_font = self._default_preview_font
+        self.preview_glyph.SetFont(preview_font)
+        self.preview_glyph.SetLabel(row.glyph)
+        self.preview_caption.SetLabel(row.name)
+        self._refresh_preview_layout()
 
     # --- Hooks for subclasses -------------------------------------------------
     def on_search_changed(self, value: str) -> None:  # pragma: no cover - virtual
@@ -192,8 +237,9 @@ class IconPickerDialog(wx.Dialog):
             # font = self._get_font_for_family(row.font_family)
             # if font is not None:
             #     self.icon_list.SetItemFont(idx, font)
-        self._update_add_button_state()
+        self._update_icon_activated()
         self.set_status(f"Showing {len(self._rows)} icons")
+        self._update_preview(None)
 
     def get_selected_row(self) -> IconListRow | None:
         index = self.icon_list.GetFirstSelected()
@@ -201,8 +247,20 @@ class IconPickerDialog(wx.Dialog):
             return None
         return self._rows[index]
 
-    def _get_font_for_family(self, family: str) -> wx.Font | None:
-        if family not in self._font_render_map:
-            info = wx.FontInfo(24).FaceName(family)
-            self._font_render_map[family] = wx.Font(info)
-        return self._font_render_map[family]
+    def _get_font_for_family(self, family: str, size: int = 24) -> wx.Font | None:
+        key = (family, size)
+        if key not in self._font_render_map:
+            info = wx.FontInfo(size).FaceName(family)
+            font = wx.Font(info)
+            if not font.IsOk():
+                font = wx.Font(wx.FontInfo(size))
+            self._font_render_map[key] = font
+        return self._font_render_map[key]
+
+    def _refresh_preview_layout(self) -> None:
+        self.preview_glyph.InvalidateBestSize()
+        self.preview_caption.InvalidateBestSize()
+        sizer = self.preview_glyph.GetContainingSizer()
+        if sizer is not None:
+            sizer.Layout()
+        self.Layout()
