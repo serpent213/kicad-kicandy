@@ -9,14 +9,18 @@
     },
     "actions": [
         {
-            "identifier": "kicandy-insert-icon",
-            "name": "Insert Icon Text",
-            "description": "Pick a Material icon and add it as silkscreen text",
+            "identifier": "insert-kicandy-icon",
+            "name": "Insert Icon",
+            "description": "Pick an icon and add it as silkscreen text",
             "show-button": true,
             "scopes": [
                 "pcb"
             ],
-            "entrypoint": "kicandy_action.py"
+            "entrypoint": "kicandy_action.py",
+            "icons-light": [
+                "icons/kicandy_24.png",
+                "icons/kicandy_48.png"
+            ]
         }
     ]
 }

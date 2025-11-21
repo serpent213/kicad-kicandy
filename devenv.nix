@@ -12,5 +12,12 @@
     };
   };
 
+  # https://devenv.sh/scripts/
+  scripts.install-plugin.exec = ''
+    PLUGIN_FOLDER=~/Documents/kicad/9.0/plugins/kicad-kicandy
+    mkdir -p $PLUGIN_FOLDER
+    cp -rv plugin.json requirements.txt icons *.py ui $PLUGIN_FOLDER
+  '';
+
   # See full reference at https://devenv.sh/reference/options/
 }
