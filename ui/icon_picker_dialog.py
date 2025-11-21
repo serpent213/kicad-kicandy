@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import math
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
 import wx
-import wx.dataview as dv
+import wx.grid as grid
 
 
 @dataclass
@@ -16,41 +17,233 @@ class IconListRow:
     payload: object
 
 
-@dataclass
-class GlyphCell:
-    glyph: str
-    font_family: str
+class IconGridTable(grid.GridTableBase):
+    def __init__(self) -> None:
+        super().__init__()
+        self._rows: list[IconListRow] = []
+        self._columns = 1
+        self._row_count = 0
+        self._view: grid.Grid | None = None
+
+    def GetNumberRows(self) -> int:  # noqa: N802 - wx override
+        return self._row_count
+
+    def GetNumberCols(self) -> int:  # noqa: N802 - wx override
+        return self._columns
+
+    def IsEmptyCell(self, row: int, col: int) -> bool:  # noqa: N802 - wx override
+        return self.get_row_for_cell(row, col) is None
+
+    def GetValue(self, row: int, col: int) -> str:  # noqa: N802 - wx override
+        item = self.get_row_for_cell(row, col)
+        if item is None:
+            return ""
+        return item.name
+
+    def SetValue(self, row: int, col: int, value: str) -> None:  # noqa: N802 - wx override
+        return
+
+    def SetView(self, grid_view: grid.Grid) -> None:  # noqa: N802 - wx override
+        super().SetView(grid_view)
+        self._view = grid_view
+
+    def update(self, rows: Sequence[IconListRow], columns: int) -> None:
+        old_rows = self._row_count
+        old_cols = self._columns
+        self._rows = list(rows)
+        self._columns = max(1, columns)
+        self._row_count = self._calculate_row_count()
+        self._refresh_view(old_rows, old_cols)
+
+    def get_row_for_cell(self, row: int, col: int) -> IconListRow | None:
+        index = row * self._columns + col
+        if 0 <= index < len(self._rows):
+            return self._rows[index]
+        return None
+
+    def _calculate_row_count(self) -> int:
+        if not self._rows:
+            return 0
+        return math.ceil(len(self._rows) / self._columns)
+
+    def _refresh_view(self, old_rows: int, old_cols: int) -> None:
+        if self._view is None:
+            return
+        self._view.BeginBatch()
+        try:
+            if self._columns != old_cols:
+                diff = abs(self._columns - old_cols)
+                if diff > 0:
+                    if self._columns < old_cols:
+                        msg = grid.GridTableMessage(
+                            self,
+                            grid.GRIDTABLE_NOTIFY_COLS_DELETED,
+                            self._columns,
+                            diff,
+                        )
+                    else:
+                        msg = grid.GridTableMessage(
+                            self,
+                            grid.GRIDTABLE_NOTIFY_COLS_APPENDED,
+                            diff,
+                        )
+                    self._view.ProcessTableMessage(msg)
+            if self._row_count != old_rows:
+                diff = abs(self._row_count - old_rows)
+                if diff > 0:
+                    if self._row_count < old_rows:
+                        msg = grid.GridTableMessage(
+                            self,
+                            grid.GRIDTABLE_NOTIFY_ROWS_DELETED,
+                            self._row_count,
+                            diff,
+                        )
+                    else:
+                        msg = grid.GridTableMessage(
+                            self,
+                            grid.GRIDTABLE_NOTIFY_ROWS_APPENDED,
+                            diff,
+                        )
+                    self._view.ProcessTableMessage(msg)
+            msg = grid.GridTableMessage(self, grid.GRIDTABLE_REQUEST_VIEW_GET_VALUES)
+            self._view.ProcessTableMessage(msg)
+        finally:
+            self._view.EndBatch()
+            self._view.ForceRefresh()
 
 
-class IconGlyphRenderer(dv.DataViewCustomRenderer):
-    def __init__(self, font_lookup: Callable[[str, int], wx.Font | None], size: int = 28) -> None:
-        super().__init__("PyObject", dv.DATAVIEW_CELL_INERT)
+class IconCellRenderer(grid.GridCellRenderer):
+    def __init__(self, font_lookup: Callable[[str, int], wx.Font | None]) -> None:
+        super().__init__()
         self._font_lookup = font_lookup
-        self._font_size = size
-        self._value: GlyphCell | None = None
 
-    def SetValue(self, value: GlyphCell | None) -> bool:  # noqa: N802 - wx override
-        if value is None or not isinstance(value, GlyphCell):
-            self._value = None
+    def Draw(  # noqa: N802 - wx override
+        self,
+        grid_view: grid.Grid,
+        attr: grid.GridCellAttr,
+        dc: wx.DC,
+        rect: wx.Rect,
+        row: int,
+        col: int,
+        isSelected: bool,
+    ) -> None:
+        table = grid_view.GetTable()
+        if not isinstance(table, IconGridTable):
+            return
+        item = table.get_row_for_cell(row, col)
+        if isSelected:
+            background = wx.SystemSettings.GetColour(wx.SYS_COLOUR_HIGHLIGHT)
+            foreground = wx.SystemSettings.GetColour(wx.SYS_COLOUR_HIGHLIGHTTEXT)
         else:
-            self._value = value
-        return True
+            background = grid_view.GetBackgroundColour()
+            foreground = grid_view.GetForegroundColour()
+        dc.SetPen(wx.TRANSPARENT_PEN)
+        dc.SetBrush(wx.Brush(background))
+        dc.DrawRectangle(rect)
+        if item is None:
+            return
+        font_size = max(24, int(rect.Height * 0.7))
+        font = self._font_lookup(item.font_family, font_size)
+        if font is None:
+            font = wx.Font(wx.FontInfo(font_size))
+        dc.SetFont(font)
+        dc.SetTextForeground(foreground)
+        dc.DrawLabel(item.glyph, rect, wx.ALIGN_CENTER_HORIZONTAL | wx.ALIGN_CENTER_VERTICAL)
 
-    def GetValue(self) -> GlyphCell | None:  # noqa: N802 - wx override
-        return self._value
+    def GetBestSize(  # noqa: N802 - wx override
+        self,
+        grid_view: grid.Grid,
+        attr: grid.GridCellAttr,
+        dc: wx.DC,
+        row: int,
+        col: int,
+    ) -> wx.Size:
+        size = grid_view.GetDefaultRowSize()
+        return wx.Size(size, size)
 
-    def GetSize(self) -> wx.Size:  # noqa: N802 - wx override
-        return wx.Size(100, self._font_size + 8)
+    def Clone(self) -> IconCellRenderer:  # noqa: N802 - wx override
+        return IconCellRenderer(self._font_lookup)
 
-    def Render(self, rect: wx.Rect, dc: wx.DC, state: int) -> bool:  # noqa: N802 - wx override
-        if self._value is None:
-            return False
-        glyph = self._value.glyph
-        font = self._font_lookup(self._value.font_family, self._font_size)
-        if font is not None:
-            dc.SetFont(font)
-        dc.DrawLabel(glyph, rect, wx.ALIGN_CENTER_HORIZONTAL | wx.ALIGN_CENTER_VERTICAL)
-        return True
+
+class IconGrid(grid.Grid):
+    def __init__(
+        self,
+        parent: wx.Window,
+        font_lookup: Callable[[str, int], wx.Font | None],
+        min_cell: int = 96,
+    ) -> None:
+        super().__init__(parent, style=wx.BORDER_THEME)
+        self._font_lookup = font_lookup
+        self._min_cell_size = min_cell
+        self._cell_size = min_cell
+        self._columns = 1
+        self._rows: list[IconListRow] = []
+        self._table = IconGridTable()
+        self.SetTable(self._table, takeOwnership=True)
+        self._configure_appearance()
+        self.SetDefaultRenderer(IconCellRenderer(self._font_lookup))
+        self.Bind(wx.EVT_SIZE, self._handle_resize)
+
+    def set_rows(self, rows: Sequence[IconListRow]) -> None:
+        self.Freeze()
+        try:
+            self._rows = list(rows)
+            self._table.update(self._rows, self._columns)
+            self.ClearSelection()
+            if self._rows and self._table.GetNumberRows() > 0:
+                self.SetGridCursor(0, 0)
+        finally:
+            self.Thaw()
+        self._update_layout()
+
+    def get_selected_row(self) -> IconListRow | None:
+        row = self.GetGridCursorRow()
+        col = self.GetGridCursorCol()
+        if row < 0 or col < 0:
+            return None
+        item = self._table.get_row_for_cell(row, col)
+        return item
+
+    def get_row_count(self) -> int:
+        return len(self._rows)
+
+    def _configure_appearance(self) -> None:
+        self.EnableEditing(False)
+        self.EnableDragColSize(False)
+        self.EnableDragRowSize(False)
+        self.EnableGridLines(False)
+        self.SetRowLabelSize(0)
+        self.SetColLabelSize(0)
+        self.SetMargins(0, 0)
+        self.SetSelectionMode(grid.Grid.SelectCells)
+        self.SetDefaultRowSize(self._cell_size, True)
+        self.SetDefaultColSize(self._cell_size, True)
+
+    def _handle_resize(self, event: wx.SizeEvent) -> None:
+        event.Skip()
+        wx.CallAfter(self._update_layout)
+
+    def _update_layout(self) -> None:
+        width = max(self.GetClientSize().width, self._min_cell_size)
+        desired_columns = max(1, width // self._min_cell_size)
+        if desired_columns != self._columns:
+            self._columns = desired_columns
+            self._table.update(self._rows, self._columns)
+        if self._columns == 0:
+            return
+        cell_size = max(self._min_cell_size, width // self._columns)
+        if cell_size != self._cell_size:
+            self._cell_size = cell_size
+        self.Freeze()
+        try:
+            self.SetDefaultColSize(self._cell_size, True)
+            self.SetDefaultRowSize(self._cell_size, True)
+            for col in range(self._columns):
+                self.SetColSize(col, self._cell_size)
+            for row in range(self._table.GetNumberRows()):
+                self.SetRowSize(row, self._cell_size)
+        finally:
+            self.Thaw()
 
 
 class IconPickerDialog(wx.Dialog):
@@ -70,8 +263,6 @@ class IconPickerDialog(wx.Dialog):
         self.layers = list(layers)
         self._font_checkboxes: dict[str, wx.CheckBox] = {}
         self._font_render_map: dict[tuple[str, int], wx.Font] = {}
-        self._rows: list[IconListRow] = []
-        self._glyph_renderer = IconGlyphRenderer(self._get_font_for_family)
         self._default_preview_font = wx.Font(wx.FontInfo(96))
 
         self._build_ui()
@@ -101,21 +292,8 @@ class IconPickerDialog(wx.Dialog):
         # Icon list + preview panel
         content_sizer = wx.BoxSizer(wx.HORIZONTAL)
 
-        self.icon_list = dv.DataViewListCtrl(
-            self,
-            style=dv.DV_ROW_LINES | dv.DV_SINGLE,
-        )
-        glyph_column = dv.DataViewColumn(
-            "Icon",
-            self._glyph_renderer,
-            0,
-            width=100,
-            align=wx.ALIGN_CENTER,
-        )
-        self.icon_list.AppendColumn(glyph_column, "PyObject")
-        self.icon_list.AppendTextColumn("Name", width=300)
-        self.icon_list.AppendTextColumn("Font", width=160)
-        content_sizer.Add(self.icon_list, 2, wx.EXPAND | wx.ALL, 5)
+        self.icon_grid = IconGrid(self, self._get_font_for_family)
+        content_sizer.Add(self.icon_grid, 2, wx.EXPAND | wx.ALL, 5)
 
         preview_box = wx.StaticBox(self, label="Preview")
         preview_sizer = wx.StaticBoxSizer(preview_box, wx.VERTICAL)
@@ -170,8 +348,8 @@ class IconPickerDialog(wx.Dialog):
         # Event wiring
         self.search_ctrl.Bind(wx.EVT_TEXT, self._handle_search)
         self.search_ctrl.Bind(wx.EVT_TEXT_ENTER, self._handle_search)
-        self.icon_list.Bind(dv.EVT_DATAVIEW_SELECTION_CHANGED, self._update_icon_activated)
-        self.icon_list.Bind(dv.EVT_DATAVIEW_ITEM_ACTIVATED, self._handle_icon_activated)
+        self.icon_grid.Bind(grid.EVT_GRID_SELECT_CELL, self._handle_grid_selection)
+        self.icon_grid.Bind(grid.EVT_GRID_CELL_LEFT_DCLICK, self._handle_icon_activated)
         self.add_button.Bind(wx.EVT_BUTTON, self._handle_add)
         self.Bind(wx.EVT_CLOSE, self._handle_close)
 
@@ -195,7 +373,11 @@ class IconPickerDialog(wx.Dialog):
     def _handle_search(self, _: wx.Event) -> None:
         self.on_search_changed(self.search_ctrl.GetValue())
 
-    def _handle_icon_activated(self, _: dv.DataViewEvent) -> None:
+    def _handle_grid_selection(self, event: grid.GridEvent) -> None:
+        event.Skip()
+        wx.CallAfter(self._update_icon_activated)
+
+    def _handle_icon_activated(self, _: wx.Event) -> None:
         self.on_icon_activated()
 
     def _handle_add(self, _: wx.CommandEvent) -> None:
@@ -205,9 +387,10 @@ class IconPickerDialog(wx.Dialog):
         self.on_close_requested()
         event.Skip()
 
-    def _update_icon_activated(self, _: dv.DataViewEvent | None = None) -> None:
-        self.add_button.Enable(self.icon_list.GetSelectedRow() != wx.NOT_FOUND)
-        self._update_preview(self.get_selected_row())
+    def _update_icon_activated(self) -> None:
+        row = self.get_selected_row()
+        self.add_button.Enable(row is not None)
+        self._update_preview(row)
 
     def _update_preview(self, row: IconListRow | None) -> None:
         if row is None:
@@ -273,21 +456,13 @@ class IconPickerDialog(wx.Dialog):
         return self.layer_choice.GetClientData(index)
 
     def set_rows(self, rows: Sequence[IconListRow]) -> None:
-        self._rows = list(rows)
-        self.icon_list.DeleteAllItems()
-        for row in self._rows:
-            glyph_value = GlyphCell(glyph=row.glyph, font_family=row.font_family)
-            self.icon_list.AppendItem([glyph_value, row.name, row.font_label])
-        self.icon_list.Refresh()
+        self.icon_grid.set_rows(rows)
         self._update_icon_activated()
-        self.set_status(f"Showing {len(self._rows)} icons")
+        self.set_status(f"Showing {self.icon_grid.get_row_count()} icons")
         self._update_preview(None)
 
     def get_selected_row(self) -> IconListRow | None:
-        index = self.icon_list.GetSelectedRow()
-        if index == -1 or index >= len(self._rows):
-            return None
-        return self._rows[index]
+        return self.icon_grid.get_selected_row()
 
     def _get_font_for_family(self, family: str, size: int = 24) -> wx.Font | None:
         key = (family, size)

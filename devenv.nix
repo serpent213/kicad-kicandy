@@ -28,6 +28,8 @@
     export WXTRACE=KICAD_API
     # API log to ~/Documents/kicad/9.0/logs/api.log
     echo "EnableAPILogging=1" > ~/Library/Preferences/kicad/9.0/kicad_advanced
+    # Avoid having Python files in pwd
+    cd ~
 
     /Applications/KiCad/KiCad.app/Contents/MacOS/kicad
   '';
