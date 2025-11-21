@@ -8,6 +8,7 @@ from pathlib import Path
 
 from kipy.board_types import BoardLayer
 
+import settings
 from icon_fonts import ICON_FONTS
 
 
@@ -18,6 +19,7 @@ class DialogState:
     enabled_fonts: dict[str, bool] = field(
         default_factory=lambda: {font.identifier: font.default_enabled for font in ICON_FONTS}
     )
+    font_size_mm: int = settings.DEFAULT_FONT_SIZE_MM
 
 
 class PluginState:
@@ -44,17 +46,38 @@ class PluginState:
             if identifier in stored_fonts:
                 self.model.enabled_fonts[identifier] = bool(stored_fonts[identifier])
 
+        stored_font_size = data.get("font_size_mm")
+        if isinstance(stored_font_size, int):
+            clamped = max(
+                settings.FONT_SIZE_MIN_MM,
+                min(settings.FONT_SIZE_MAX_MM, stored_font_size),
+            )
+            self.model.font_size_mm = clamped
+
     def save(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         payload = {
             "search": self.model.search,
             "layer": self.model.layer,
             "enabled_fonts": self.model.enabled_fonts,
+            "font_size_mm": self.model.font_size_mm,
         }
         self.path.write_text(json.dumps(payload, indent=2))
 
-    def update(self, *, search: str, layer: int, enabled_fonts: dict[str, bool]) -> None:
+    def update(
+        self,
+        *,
+        search: str,
+        layer: int,
+        enabled_fonts: dict[str, bool],
+        font_size_mm: int,
+    ) -> None:
         self.model.search = search
         self.model.layer = layer
         self.model.enabled_fonts = enabled_fonts
+        clamped_size = max(
+            settings.FONT_SIZE_MIN_MM,
+            min(settings.FONT_SIZE_MAX_MM, font_size_mm),
+        )
+        self.model.font_size_mm = clamped_size
         self.save()

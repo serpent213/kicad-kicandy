@@ -76,6 +76,7 @@ class KicandyDialog(IconPickerDialog):
         self.set_layer_value(self.state.model.layer)
         if self.layer_choice.GetSelection() == wx.NOT_FOUND and self.layer_choice.GetCount() > 0:
             self.layer_choice.SetSelection(0)
+        self.set_font_size_mm(self.state.model.font_size_mm)
 
     def _persist_state(self) -> None:
         enabled_map: dict[str, bool] = {
@@ -86,6 +87,7 @@ class KicandyDialog(IconPickerDialog):
             search=self.search_ctrl.GetValue(),
             layer=layer,
             enabled_fonts=enabled_map,
+            font_size_mm=self.get_font_size_mm(),
         )
 
     def _refresh_icons(self) -> None:
@@ -134,6 +136,8 @@ class KicandyDialog(IconPickerDialog):
         defaults = self.board.get_graphics_defaults()[BoardLayerClass.BLC_SILKSCREEN]
         text.attributes = defaults.text
         text.attributes.font_name = glyph.font_family
+        font_size_mm = self.get_font_size_mm()
+        text.attributes.size = Vector2.from_xy_mm(font_size_mm, font_size_mm)
         text.attributes.mirrored = layer == BoardLayer.BL_B_SilkS
 
         created = self.board.create_items(text)

@@ -7,6 +7,8 @@ from dataclasses import dataclass
 import wx
 import wx.grid as grid
 
+import settings
+
 
 @dataclass
 class IconListRow:
@@ -247,6 +249,10 @@ class IconGrid(grid.Grid):
 
 
 class IconPickerDialog(wx.Dialog):
+    FONT_SIZE_MIN_MM = settings.FONT_SIZE_MIN_MM
+    FONT_SIZE_MAX_MM = settings.FONT_SIZE_MAX_MM
+    DEFAULT_FONT_SIZE_MM = settings.DEFAULT_FONT_SIZE_MM
+
     def __init__(
         self,
         fonts: Sequence[tuple[str, str]],
@@ -325,6 +331,23 @@ class IconPickerDialog(wx.Dialog):
         self.status_text = wx.StaticText(self, label="Ready")
         status_row.Add(self.status_text, 1, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
 
+        font_size_sizer = wx.BoxSizer(wx.VERTICAL)
+        self.font_size_label = wx.StaticText(self, label="")
+        self.font_size_slider = wx.Slider(
+            self,
+            value=self.DEFAULT_FONT_SIZE_MM,
+            minValue=self.FONT_SIZE_MIN_MM,
+            maxValue=self.FONT_SIZE_MAX_MM,
+            style=wx.SL_HORIZONTAL,
+        )
+        self.font_size_slider.SetMinSize(wx.Size(160, -1))
+        self.font_size_slider.SetTickFreq(1)
+        self.font_size_slider.SetLineSize(1)
+        self.font_size_slider.SetPageSize(1)
+        font_size_sizer.Add(self.font_size_label, 0, wx.ALIGN_CENTER_HORIZONTAL | wx.BOTTOM, 2)
+        font_size_sizer.Add(self.font_size_slider, 1, wx.EXPAND)
+        status_row.Add(font_size_sizer, 1, wx.EXPAND | wx.ALL, 5)
+
         layer_label = wx.StaticText(self, label="Layer")
         status_row.Add(layer_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.LEFT, 5)
 
@@ -351,7 +374,10 @@ class IconPickerDialog(wx.Dialog):
         self.icon_grid.Bind(grid.EVT_GRID_SELECT_CELL, self._handle_grid_selection)
         self.icon_grid.Bind(grid.EVT_GRID_CELL_LEFT_DCLICK, self._handle_icon_activated)
         self.add_button.Bind(wx.EVT_BUTTON, self._handle_add)
+        self.font_size_slider.Bind(wx.EVT_SLIDER, self._handle_font_size_change)
         self.Bind(wx.EVT_CLOSE, self._handle_close)
+
+        self._update_font_size_label(self.font_size_slider.GetValue())
 
     def _populate_fonts(self) -> None:
         for identifier, label in self.fonts:
@@ -386,6 +412,9 @@ class IconPickerDialog(wx.Dialog):
     def _handle_close(self, event: wx.CloseEvent) -> None:
         self.on_close_requested()
         event.Skip()
+
+    def _handle_font_size_change(self, _: wx.CommandEvent) -> None:
+        self._update_font_size_label(self.font_size_slider.GetValue())
 
     def _update_icon_activated(self) -> None:
         row = self.get_selected_row()
@@ -464,6 +493,14 @@ class IconPickerDialog(wx.Dialog):
     def get_selected_row(self) -> IconListRow | None:
         return self.icon_grid.get_selected_row()
 
+    def set_font_size_mm(self, size_mm: int) -> None:
+        clamped = max(self.FONT_SIZE_MIN_MM, min(size_mm, self.FONT_SIZE_MAX_MM))
+        self.font_size_slider.SetValue(clamped)
+        self._update_font_size_label(clamped)
+
+    def get_font_size_mm(self) -> int:
+        return self.font_size_slider.GetValue()
+
     def _get_font_for_family(self, family: str, size: int = 24) -> wx.Font | None:
         key = (family, size)
         if key not in self._font_render_map:
@@ -481,3 +518,6 @@ class IconPickerDialog(wx.Dialog):
         if sizer is not None:
             sizer.Layout()
         self.Layout()
+
+    def _update_font_size_label(self, value: int) -> None:
+        self.font_size_label.SetLabel(f"Font size: {value} mm")
