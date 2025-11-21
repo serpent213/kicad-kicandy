@@ -37,6 +37,7 @@ searchable gallery of icons grouped by font style (Outlined, Rounded, Sharp).
 - Dialog state is stored in `kicandy_state.json` next to `kicandy_action.py`.
 - If the KiCad scripting sandbox cannot reach GitHub, the dialog will show an
   error and stay empty until connectivity is available.
+- wxPython version during development: 4.2.2a1 osx-cocoa (phoenix) wxWidgets 3.2.8
 
 ## Extending
 
@@ -45,4 +46,3 @@ the human-readable name, style label, system font family, and download URLs for
 both the codepoint file and any font binaries you want to expose later. The
 dialog builds its checkbox list directly from this metadata so new sets will
 appear automatically.
-

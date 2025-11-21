@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
 import wx
+import wx.dataview as dv
 
 
 @dataclass
@@ -13,6 +14,43 @@ class IconListRow:
     font_label: str
     font_family: str
     payload: object
+
+
+@dataclass
+class GlyphCell:
+    glyph: str
+    font_family: str
+
+
+class IconGlyphRenderer(dv.DataViewCustomRenderer):
+    def __init__(self, font_lookup: Callable[[str, int], wx.Font | None], size: int = 28) -> None:
+        super().__init__("PyObject", dv.DATAVIEW_CELL_INERT)
+        self._font_lookup = font_lookup
+        self._font_size = size
+        self._value: GlyphCell | None = None
+
+    def SetValue(self, value: GlyphCell | None) -> bool:  # noqa: N802 - wx override
+        if value is None or not isinstance(value, GlyphCell):
+            self._value = None
+        else:
+            self._value = value
+        return True
+
+    def GetValue(self) -> GlyphCell | None:  # noqa: N802 - wx override
+        return self._value
+
+    def GetSize(self) -> wx.Size:  # noqa: N802 - wx override
+        return wx.Size(100, self._font_size + 8)
+
+    def Render(self, rect: wx.Rect, dc: wx.DC, state: int) -> bool:  # noqa: N802 - wx override
+        if self._value is None:
+            return False
+        glyph = self._value.glyph
+        font = self._font_lookup(self._value.font_family, self._font_size)
+        if font is not None:
+            dc.SetFont(font)
+        dc.DrawLabel(glyph, rect, wx.ALIGN_CENTER_HORIZONTAL | wx.ALIGN_CENTER_VERTICAL)
+        return True
 
 
 class IconPickerDialog(wx.Dialog):
@@ -33,6 +71,7 @@ class IconPickerDialog(wx.Dialog):
         self._font_checkboxes: dict[str, wx.CheckBox] = {}
         self._font_render_map: dict[tuple[str, int], wx.Font] = {}
         self._rows: list[IconListRow] = []
+        self._glyph_renderer = IconGlyphRenderer(self._get_font_for_family)
         self._default_preview_font = wx.Font(wx.FontInfo(96))
 
         self._build_ui()
@@ -62,13 +101,20 @@ class IconPickerDialog(wx.Dialog):
         # Icon list + preview panel
         content_sizer = wx.BoxSizer(wx.HORIZONTAL)
 
-        self.icon_list = wx.ListCtrl(
+        self.icon_list = dv.DataViewListCtrl(
             self,
-            style=wx.LC_REPORT | wx.LC_SINGLE_SEL | wx.LC_HRULES | wx.LC_VRULES,
+            style=dv.DV_ROW_LINES | dv.DV_SINGLE,
         )
-        self.icon_list.InsertColumn(0, "Icon", width=100)
-        self.icon_list.InsertColumn(1, "Name", width=300)
-        self.icon_list.InsertColumn(2, "Font", width=160)
+        glyph_column = dv.DataViewColumn(
+            "Icon",
+            self._glyph_renderer,
+            0,
+            width=100,
+            align=wx.ALIGN_CENTER,
+        )
+        self.icon_list.AppendColumn(glyph_column, "PyObject")
+        self.icon_list.AppendTextColumn("Name", width=300)
+        self.icon_list.AppendTextColumn("Font", width=160)
         content_sizer.Add(self.icon_list, 2, wx.EXPAND | wx.ALL, 5)
 
         preview_box = wx.StaticBox(self, label="Preview")
@@ -124,9 +170,8 @@ class IconPickerDialog(wx.Dialog):
         # Event wiring
         self.search_ctrl.Bind(wx.EVT_TEXT, self._handle_search)
         self.search_ctrl.Bind(wx.EVT_TEXT_ENTER, self._handle_search)
-        self.icon_list.Bind(wx.EVT_LIST_ITEM_SELECTED, self._update_icon_activated)
-        self.icon_list.Bind(wx.EVT_LIST_ITEM_DESELECTED, self._update_icon_activated)
-        self.icon_list.Bind(wx.EVT_LIST_ITEM_ACTIVATED, self._handle_icon_activated)
+        self.icon_list.Bind(dv.EVT_DATAVIEW_SELECTION_CHANGED, self._update_icon_activated)
+        self.icon_list.Bind(dv.EVT_DATAVIEW_ITEM_ACTIVATED, self._handle_icon_activated)
         self.add_button.Bind(wx.EVT_BUTTON, self._handle_add)
         self.Bind(wx.EVT_CLOSE, self._handle_close)
 
@@ -150,7 +195,7 @@ class IconPickerDialog(wx.Dialog):
     def _handle_search(self, _: wx.Event) -> None:
         self.on_search_changed(self.search_ctrl.GetValue())
 
-    def _handle_icon_activated(self, _: wx.ListEvent) -> None:
+    def _handle_icon_activated(self, _: dv.DataViewEvent) -> None:
         self.on_icon_activated()
 
     def _handle_add(self, _: wx.CommandEvent) -> None:
@@ -160,8 +205,8 @@ class IconPickerDialog(wx.Dialog):
         self.on_close_requested()
         event.Skip()
 
-    def _update_icon_activated(self, _: wx.ListEvent | None = None) -> None:
-        self.add_button.Enable(self.icon_list.GetFirstSelected() != -1)
+    def _update_icon_activated(self, _: dv.DataViewEvent | None = None) -> None:
+        self.add_button.Enable(self.icon_list.GetSelectedRow() != wx.NOT_FOUND)
         self._update_preview(self.get_selected_row())
 
     def _update_preview(self, row: IconListRow | None) -> None:
@@ -230,19 +275,16 @@ class IconPickerDialog(wx.Dialog):
     def set_rows(self, rows: Sequence[IconListRow]) -> None:
         self._rows = list(rows)
         self.icon_list.DeleteAllItems()
-        for idx, row in enumerate(self._rows):
-            self.icon_list.InsertItem(idx, row.glyph)
-            self.icon_list.SetItem(idx, 1, row.name)
-            self.icon_list.SetItem(idx, 2, row.font_label)
-            # font = self._get_font_for_family(row.font_family)
-            # if font is not None:
-            #     self.icon_list.SetItemFont(idx, font)
+        for row in self._rows:
+            glyph_value = GlyphCell(glyph=row.glyph, font_family=row.font_family)
+            self.icon_list.AppendItem([glyph_value, row.name, row.font_label])
+        self.icon_list.Refresh()
         self._update_icon_activated()
         self.set_status(f"Showing {len(self._rows)} icons")
         self._update_preview(None)
 
     def get_selected_row(self) -> IconListRow | None:
-        index = self.icon_list.GetFirstSelected()
+        index = self.icon_list.GetSelectedRow()
         if index == -1 or index >= len(self._rows):
             return None
         return self._rows[index]

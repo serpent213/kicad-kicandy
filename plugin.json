@@ -2,7 +2,7 @@
     "$schema": "https://go.kicad.org/api/schemas/v1",
     "identifier": "de.reactor.kicandy",
     "name": "KiCandy Icon Picker",
-    "description": "Insert Material Symbols glyphs as silkscreen text",
+    "description": "Insert symbol glyphs as silkscreen text",
     "runtime": {
         "type": "python",
         "min_version": "3.9"
