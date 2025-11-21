@@ -19,7 +19,8 @@
             "entrypoint": "kicandy_action.py",
             "icons-light": [
                 "icons/kicandy_24.png",
-                "icons/kicandy_48.png"
+                "icons/kicandy_48.png",
+                "icons/kicandy_64.png"
             ]
         }
     ]

@@ -1,0 +1,33 @@
+{
+    "$schema": "https://go.kicad.org/pcm/schemas/v1",
+    "name": "KiCandy Icon Picker",
+    "description": "Insert Material Symbols glyphs as silkscreen text",
+    "description_full": "KiCandy lets you search the Material Symbols catalog inside KiCad and drop glyphs directly onto the board as text items.",
+    "identifier": "de.reactor.kicandy",
+    "type": "plugin",
+    "author": {
+        "name": "Steffen Beyer",
+        "contact": {
+            "github": "serpent213"
+        }
+    },
+    "maintainer": {
+        "name": "Steffen Beyer",
+        "contact": {
+            "github": "serpent213"
+        }
+    },
+    "license": "Proprietary",
+    "resources": {
+        "homepage": "https://github.com/serpent213/kicad-kicandy"
+    },
+    "versions": [{
+        "version": "VERSION_HERE",
+        "status": "testing",
+        "kicad_version": "9.0",
+        "download_sha256": "SHA256_HERE",
+        "download_size": DOWNLOAD_SIZE_HERE,
+        "download_url": "DOWNLOAD_URL_HERE",
+        "install_size": INSTALL_SIZE_HERE
+    }]
+}

@@ -1,0 +1,50 @@
+name: KiCAD PCM packaging
+
+on:
+  release:
+    branches: [master]
+    types:
+      - published
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  create_archive:
+    runs-on: ubuntu-latest
+    env:
+      PCM_REBUILD_REPO: ${{ vars.PCM_REBUILD_REPO }}
+      PCM_REBUILD_WORKFLOW: ${{ vars.PCM_REBUILD_WORKFLOW }}
+    steps:
+      - name: Get latest tag
+        id: latest-release
+        uses: oprypin/find-latest-tag@v1
+        with:
+          repository: ${{ github.repository }}
+          releases-only: true
+
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Create archive
+        run: bash ./PCM/create_pcm_archive.sh ${{ steps.latest-release.outputs.tag }}
+
+      - name: Upload zip as asset to release
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: ./PCM/KiCandy-PCM-${{ steps.latest-release.outputs.tag }}.zip
+          asset_name: KiCandy-PCM-${{ steps.latest-release.outputs.tag }}.zip
+          overwrite: true
+          tag: ${{ steps.latest-release.outputs.tag }}
+
+      # - name: Trigger custom KiCad repo rebuild
+      #   if: env.PCM_REBUILD_REPO != '' && env.PCM_REBUILD_WORKFLOW != '' && secrets.PERSONAL_TOKEN != ''
+      #   uses: benc-uk/workflow-dispatch@v1
+      #   with:
+      #     workflow: ${{ env.PCM_REBUILD_WORKFLOW }}
+      #     ref: refs/heads/main
+      #     repo: ${{ env.PCM_REBUILD_REPO }}
+      #     token: ${{ secrets.PERSONAL_TOKEN }}
+      #     inputs: '{ "VERSION": "${{ env.VERSION }}", "DOWNLOAD_SHA256": "${{ env.DOWNLOAD_SHA256 }}", "DOWNLOAD_SIZE": "${{ env.DOWNLOAD_SIZE }}", "DOWNLOAD_URL": "${{ env.DOWNLOAD_URL }}", "INSTALL_SIZE": "${{ env.INSTALL_SIZE }}" }'
