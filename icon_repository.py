@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import ssl
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
+
+import certifi
 
 from icon_fonts import ICON_FONTS, IconFont
 
@@ -30,6 +33,9 @@ class IconGlyph:
     search_target: str
 
 
+_SSL_CONTEXT = ssl.create_default_context(cafile=certifi.where())
+
+
 class IconRepository:
     def __init__(
         self, cache_dir: Path | None = None, fonts: Sequence[IconFont] | None = None
@@ -46,7 +52,7 @@ class IconRepository:
     def _download(self, font: IconFont, destination: Path) -> None:
         request = Request(font.codepoints_url, headers={"User-Agent": "kicandy-icon-fetcher"})
         try:
-            with urlopen(request, timeout=10) as response:
+            with urlopen(request, timeout=10, context=_SSL_CONTEXT) as response:
                 destination.write_bytes(response.read())
         except (URLError, HTTPError) as exc:
             raise IconDownloadError(f"Unable to download {font.codepoints_url}: {exc}") from exc
