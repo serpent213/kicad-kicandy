@@ -134,6 +134,7 @@ class KicandyDialog(IconPickerDialog):
         defaults = self.board.get_graphics_defaults()[BoardLayerClass.BLC_SILKSCREEN]
         text.attributes = defaults.text
         text.attributes.font_name = glyph.font_family
+        text.attributes.mirrored = layer == BoardLayer.BL_B_SilkS
 
         created = self.board.create_items(text)
         if created:
