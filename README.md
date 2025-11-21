@@ -39,6 +39,14 @@ searchable gallery of icons grouped by font style (Outlined, Rounded, Sharp).
   error and stay empty until connectivity is available.
 - wxPython version during development: 4.2.2a1 osx-cocoa (phoenix) wxWidgets 3.2.8
 
+### Profiling
+
+- Add `pyinstrument>=5.1.1` to `requirements.txt` (for KiCad to pick it up) to
+  enable the optional startup profiler.
+- When present, invoking the plugin writes PyInstrument output to
+  `/tmp/kicandy_profile.txt` (text) and `/tmp/kicandy_profile.html` (HTML) after
+  the dialog closes, making it easy to analyze slow launches.
+
 ## Extending
 
 To add new icon sets, append entries to `ICON_FONTS` in `icon_fonts.py`. Provide

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Protocol
 
 import wx
 from kipy import KiCad
@@ -23,7 +24,19 @@ LAYER_CHOICES = [
 ]
 
 STATE_PATH = Path(__file__).with_name("kicandy_state.json")
+PROFILE_TXT_OUTPUT_PATH = Path("/tmp/kicandy_profile.txt")
+PROFILE_HTML_OUTPUT_PATH = Path("/tmp/kicandy_profile.html")
 _WX_APP: wx.App | None = None
+
+
+class _Profiler(Protocol):
+    def start(self) -> None: ...
+
+    def stop(self) -> None: ...
+
+    def output_text(self, unicode: bool = False, color: bool = False) -> str: ...
+
+    def output_html(self) -> str: ...
 
 
 class KicandyDialog(IconPickerDialog):
@@ -37,7 +50,7 @@ class KicandyDialog(IconPickerDialog):
         self._last_download_failed = False
 
         self._restore_state()
-        self._refresh_icons()
+        # Initial refresh runs via the search control's EVT_TEXT fired during _restore_state.
 
     # --- Event hooks --------------------------------------------------------
     def on_search_changed(self, _: str) -> None:
@@ -143,12 +156,41 @@ def _ensure_wx_app() -> wx.App:
 
 
 def main() -> None:
-    _ensure_wx_app()
-    dialog = KicandyDialog()
+    profiler = _start_profiler()
     try:
-        dialog.ShowModal()
+        _ensure_wx_app()
+        dialog = KicandyDialog()
+        try:
+            dialog.ShowModal()
+        finally:
+            dialog.Destroy()
     finally:
-        dialog.Destroy()
+        _finalize_profiler(profiler)
+
+
+def _start_profiler() -> _Profiler | None:
+    try:
+        from pyinstrument import Profiler
+    except ModuleNotFoundError:
+        return None
+
+    profiler = Profiler()
+    profiler.start()
+    return profiler
+
+
+def _finalize_profiler(profiler: _Profiler | None) -> None:
+    if profiler is None:
+        return
+
+    try:
+        profiler.stop()
+        PROFILE_TXT_OUTPUT_PATH.write_text(
+            profiler.output_text(unicode=True, color=False), encoding="utf-8"
+        )
+        PROFILE_HTML_OUTPUT_PATH.write_text(profiler.output_html(), encoding="utf-8")
+    except OSError:
+        pass
 
 
 if __name__ == "__main__":
