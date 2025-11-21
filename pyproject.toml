@@ -1,0 +1,32 @@
+[build-system]
+requires = ["hatchling>=1.21"]
+build-backend = "hatchling.build"
+
+[project]
+name = "kicad-kicandy"
+version = "0.1.0"
+description = "KiCad 9 action plugin that inserts Material Symbols into silkscreen"
+authors = [{ name = "Steffen Beyer" }]
+readme = "README.md"
+requires-python = ">=3.9,<4.0"
+dependencies = [
+  "wxPython>=4.2.1",
+]
+
+[dependency-groups]
+dev = [
+  "pytest>=8.3",
+  "ruff>=0.3",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["."]
+
+[tool.uv]
+default-groups = ["dev"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+select = ["E", "F", "W", "B", "I", "UP", "ANN"]
+ignore = ["ANN101", "ANN102"]
