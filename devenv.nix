@@ -15,8 +15,9 @@
   # https://devenv.sh/scripts/
   scripts.install-plugin.exec = ''
     PLUGIN_FOLDER=~/Documents/kicad/9.0/plugins/kicad-kicandy
-    mkdir -p $PLUGIN_FOLDER
-    cp -rv plugin.json requirements.txt icons *.py ui $PLUGIN_FOLDER
+    mkdir -p $\{PLUGIN_FOLDER}/icons
+    cp -rv plugin.json requirements.txt *.py ui $PLUGIN_FOLDER
+    cp -rv icons/*.png $PLUGIN_FOLDER/icons
   '';
 
   scripts.kicad-debug.exec = ''
