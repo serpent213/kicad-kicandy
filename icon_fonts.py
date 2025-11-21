@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, List, Tuple
 
 
 @dataclass(frozen=True)
@@ -21,11 +20,11 @@ class IconFont:
     style_label: str
     font_family: str
     codepoints_url: str
-    font_files: Tuple[IconFontFile, ...]
+    font_files: tuple[IconFontFile, ...]
     default_enabled: bool = True
 
 
-def _font_files(filename: str) -> Tuple[IconFontFile, ...]:
+def _font_files(filename: str) -> tuple[IconFontFile, ...]:
     base = "https://raw.githubusercontent.com/google/material-design-icons/master/variablefont/"
     return (
         IconFontFile(url=f"{base}{filename}.ttf", format="ttf"),
@@ -33,7 +32,7 @@ def _font_files(filename: str) -> Tuple[IconFontFile, ...]:
     )
 
 
-ICON_FONTS: Tuple[IconFont, ...] = (
+ICON_FONTS: tuple[IconFont, ...] = (
     IconFont(
         identifier="material-symbols-outlined",
         display_name="Material Symbols",
@@ -73,11 +72,12 @@ ICON_FONTS: Tuple[IconFont, ...] = (
 )
 
 
-ICON_FONTS_BY_ID: Dict[str, IconFont] = {font.identifier: font for font in ICON_FONTS}
+ICON_FONTS_BY_ID: dict[str, IconFont] = {font.identifier: font for font in ICON_FONTS}
 
 
-def ordered_fonts(font_ids: List[str] | None = None) -> List[IconFont]:
+def ordered_fonts(font_ids: list[str] | None = None) -> list[IconFont]:
     if not font_ids:
         return list(ICON_FONTS)
-    return [ICON_FONTS_BY_ID[identifier] for identifier in font_ids if identifier in ICON_FONTS_BY_ID]
-
+    return [
+        ICON_FONTS_BY_ID[identifier] for identifier in font_ids if identifier in ICON_FONTS_BY_ID
+    ]

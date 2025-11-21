@@ -28,5 +28,4 @@ default-groups = ["dev"]
 [tool.ruff]
 line-length = 100
 target-version = "py39"
-select = ["E", "F", "W", "B", "I", "UP", "ANN"]
-ignore = ["ANN101", "ANN102"]
+lint.select = ["E", "F", "W", "B", "I", "UP", "ANN"]

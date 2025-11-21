@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict
 
 from kipy.board_types import BoardLayer
 
@@ -16,13 +15,13 @@ from icon_fonts import ICON_FONTS
 class DialogState:
     search: str = ""
     layer: int = BoardLayer.BL_F_SilkS
-    enabled_fonts: Dict[str, bool] = field(
+    enabled_fonts: dict[str, bool] = field(
         default_factory=lambda: {font.identifier: font.default_enabled for font in ICON_FONTS}
     )
 
 
 class PluginState:
-    def __init__(self, path: Path):
+    def __init__(self, path: Path) -> None:
         self.path = path
         self.model = DialogState()
         self.load()
@@ -54,9 +53,8 @@ class PluginState:
         }
         self.path.write_text(json.dumps(payload, indent=2))
 
-    def update(self, *, search: str, layer: int, enabled_fonts: Dict[str, bool]) -> None:
+    def update(self, *, search: str, layer: int, enabled_fonts: dict[str, bool]) -> None:
         self.model.search = search
         self.model.layer = layer
         self.model.enabled_fonts = enabled_fonts
         self.save()
-

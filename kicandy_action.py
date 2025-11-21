@@ -1,10 +1,8 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Dict
 
 import wx
-
 from kipy import KiCad
 from kipy.board import BoardLayerClass
 from kipy.board_types import BoardLayer, BoardText
@@ -14,7 +12,6 @@ from icon_fonts import ICON_FONTS
 from icon_repository import IconDownloadError, IconGlyph, IconRepository
 from state_store import PluginState
 from ui.icon_picker_dialog import IconListRow, IconPickerDialog
-
 
 FONT_CHOICES = [
     (font.identifier, f"{font.display_name} ({font.style_label})") for font in ICON_FONTS
@@ -29,7 +26,7 @@ STATE_PATH = Path(__file__).with_name("kicandy_state.json")
 
 
 class KicandyDialog(IconPickerDialog):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(fonts=FONT_CHOICES, layers=LAYER_CHOICES, parent=None)
 
         self.kicad = KiCad()
@@ -67,9 +64,8 @@ class KicandyDialog(IconPickerDialog):
             self.layer_choice.SetSelection(0)
 
     def _persist_state(self) -> None:
-        enabled_map: Dict[str, bool] = {
-            font_id: font_id in self.get_enabled_fonts()
-            for font_id, _ in FONT_CHOICES
+        enabled_map: dict[str, bool] = {
+            font_id: font_id in self.get_enabled_fonts() for font_id, _ in FONT_CHOICES
         }
         layer = self.get_layer_value() or BoardLayer.BL_F_SilkS
         self.state.update(

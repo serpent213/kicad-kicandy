@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Iterable, List, Sequence
-from urllib.error import URLError, HTTPError
+from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from icon_fonts import ICON_FONTS, IconFont
@@ -31,11 +31,13 @@ class IconGlyph:
 
 
 class IconRepository:
-    def __init__(self, cache_dir: Path | None = None, fonts: Sequence[IconFont] | None = None):
+    def __init__(
+        self, cache_dir: Path | None = None, fonts: Sequence[IconFont] | None = None
+    ) -> None:
         self.cache_dir = cache_dir or Path(__file__).parent / "cache"
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         self.fonts = {font.identifier: font for font in (fonts or ICON_FONTS)}
-        self._glyph_cache: Dict[str, List[IconGlyph]] = {}
+        self._glyph_cache: dict[str, list[IconGlyph]] = {}
 
     def _cache_path(self, font: IconFont) -> Path:
         safe_identifier = font.identifier.replace("/", "_")
@@ -49,8 +51,8 @@ class IconRepository:
         except (URLError, HTTPError) as exc:
             raise IconDownloadError(f"Unable to download {font.codepoints_url}: {exc}") from exc
 
-    def _parse_codepoints(self, data: str, font: IconFont) -> List[IconGlyph]:
-        glyphs: List[IconGlyph] = []
+    def _parse_codepoints(self, data: str, font: IconFont) -> list[IconGlyph]:
+        glyphs: list[IconGlyph] = []
         for line in data.splitlines():
             stripped = line.strip()
             if not stripped or stripped.startswith("#"):
@@ -60,7 +62,9 @@ class IconRepository:
                 continue
             name, codepoint = parts
             character = chr(int(codepoint, 16))
-            search_target = " ".join([name.replace("_", " "), font.style_label, font.display_name]).lower()
+            search_target = " ".join(
+                [name.replace("_", " "), font.style_label, font.display_name]
+            ).lower()
             glyphs.append(
                 IconGlyph(
                     font_id=font.identifier,
@@ -74,7 +78,7 @@ class IconRepository:
             )
         return glyphs
 
-    def _load_glyphs(self, font: IconFont, force_refresh: bool = False) -> List[IconGlyph]:
+    def _load_glyphs(self, font: IconFont, force_refresh: bool = False) -> list[IconGlyph]:
         if not force_refresh and font.identifier in self._glyph_cache:
             return self._glyph_cache[font.identifier]
 
@@ -91,8 +95,8 @@ class IconRepository:
         for font in self.fonts.values():
             self._load_glyphs(font, force_refresh=refresh)
 
-    def get_glyphs(self, font_ids: Iterable[str]) -> List[IconGlyph]:
-        glyphs: List[IconGlyph] = []
+    def get_glyphs(self, font_ids: Iterable[str]) -> list[IconGlyph]:
+        glyphs: list[IconGlyph] = []
         for font_id in font_ids:
             font = self.fonts.get(font_id)
             if not font:
@@ -100,12 +104,12 @@ class IconRepository:
             glyphs.extend(self._load_glyphs(font))
         return glyphs
 
-    def search(self, font_ids: Iterable[str], query: str) -> List[IconGlyph]:
+    def search(self, font_ids: Iterable[str], query: str) -> list[IconGlyph]:
         glyphs = self.get_glyphs(font_ids)
         tokens = [token for token in query.lower().split() if token]
         if not tokens:
             return sorted(glyphs, key=lambda item: item.name)
-        filtered: List[IconGlyph] = []
+        filtered: list[IconGlyph] = []
         for glyph in glyphs:
             if all(token in glyph.search_target for token in tokens):
                 filtered.append(glyph)

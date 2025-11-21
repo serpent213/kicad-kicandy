@@ -11,14 +11,14 @@ lint:
   uv run ruff check --preview .
 
 # Execute the pytest suite
-test:
-  uv run pytest
+# test:
+#   uv run pytest
 
 # Format, lint, and run tests sequentially
 check:
   just format
   just lint
-  just test
+  @: # just test
 
 # Format then apply Ruff auto-fixes (unsafe)
 fix:

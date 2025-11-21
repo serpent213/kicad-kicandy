@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import wx
 
@@ -12,16 +12,16 @@ class IconListRow:
     name: str
     font_label: str
     font_family: str
-    payload: Any
+    payload: object
 
 
 class IconPickerDialog(wx.Dialog):
     def __init__(
         self,
-        fonts: Sequence[Tuple[str, str]],
-        layers: Sequence[Tuple[str, Any]],
-        parent: Optional[wx.Window] = None,
-    ):
+        fonts: Sequence[tuple[str, str]],
+        layers: Sequence[tuple[str, object]],
+        parent: wx.Window | None = None,
+    ) -> None:
         super().__init__(
             parent,
             title="Kicandy Icon Picker",
@@ -30,9 +30,9 @@ class IconPickerDialog(wx.Dialog):
 
         self.fonts = list(fonts)
         self.layers = list(layers)
-        self._font_checkboxes: Dict[str, wx.CheckBox] = {}
-        self._font_render_map: Dict[str, wx.Font] = {}
-        self._rows: List[IconListRow] = []
+        self._font_checkboxes: dict[str, wx.CheckBox] = {}
+        self._font_render_map: dict[str, wx.Font] = {}
+        self._rows: list[IconListRow] = []
 
         self._build_ui()
         self._populate_fonts()
@@ -50,8 +50,8 @@ class IconPickerDialog(wx.Dialog):
         root_sizer.Add(search_sizer, 0, wx.EXPAND)
 
         # Font filters
-        font_box = wx.StaticBox(self, label="Icon Sets")
-        font_sizer = wx.StaticBoxSizer(font_box, wx.HORIZONTAL)
+        self.font_box = wx.StaticBox(self, label="Icon Sets")
+        font_sizer = wx.StaticBoxSizer(self.font_box, wx.HORIZONTAL)
         self.font_grid = wx.FlexGridSizer(0, 2, 2, 10)
         self.font_grid.AddGrowableCol(0)
         font_sizer.Add(self.font_grid, 1, wx.ALL | wx.EXPAND, 5)
@@ -103,7 +103,7 @@ class IconPickerDialog(wx.Dialog):
 
     def _populate_fonts(self) -> None:
         for identifier, label in self.fonts:
-            checkbox = wx.CheckBox(font_box, label=label)
+            checkbox = wx.CheckBox(self.font_box, label=label)
             checkbox.SetValue(True)
             checkbox.Bind(
                 wx.EVT_CHECKBOX,
@@ -131,7 +131,7 @@ class IconPickerDialog(wx.Dialog):
         self.on_close_requested()
         event.Skip()
 
-    def _update_add_button_state(self, _: Optional[wx.ListEvent] = None) -> None:
+    def _update_add_button_state(self, _: wx.ListEvent | None = None) -> None:
         self.add_button.Enable(self.icon_list.GetFirstSelected() != -1)
 
     # --- Hooks for subclasses -------------------------------------------------
@@ -159,7 +159,7 @@ class IconPickerDialog(wx.Dialog):
         if checkbox is not None:
             checkbox.SetValue(enabled)
 
-    def get_enabled_fonts(self) -> List[str]:
+    def get_enabled_fonts(self) -> list[str]:
         result = []
         for font_id, checkbox in self._font_checkboxes.items():
             if checkbox.GetValue():
@@ -169,13 +169,13 @@ class IconPickerDialog(wx.Dialog):
     def set_search_text(self, text: str) -> None:
         self.search_ctrl.SetValue(text)
 
-    def set_layer_value(self, payload: Any) -> None:
+    def set_layer_value(self, payload: object) -> None:
         for index in range(self.layer_choice.GetCount()):
             if self.layer_choice.GetClientData(index) == payload:
                 self.layer_choice.SetSelection(index)
                 return
 
-    def get_layer_value(self) -> Any:
+    def get_layer_value(self) -> object | None:
         index = self.layer_choice.GetSelection()
         if index == wx.NOT_FOUND:
             return None
@@ -194,13 +194,13 @@ class IconPickerDialog(wx.Dialog):
         self._update_add_button_state()
         self.set_status(f"Showing {len(self._rows)} icons")
 
-    def get_selected_row(self) -> Optional[IconListRow]:
+    def get_selected_row(self) -> IconListRow | None:
         index = self.icon_list.GetFirstSelected()
         if index == -1 or index >= len(self._rows):
             return None
         return self._rows[index]
 
-    def _get_font_for_family(self, family: str) -> Optional[wx.Font]:
+    def _get_font_for_family(self, family: str) -> wx.Font | None:
         if family not in self._font_render_map:
             info = wx.FontInfo(24).Family(wx.FONTFAMILY_DEFAULT).FaceName(family)
             self._font_render_map[family] = wx.Font(info)
