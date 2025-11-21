@@ -10,6 +10,7 @@ authors = [{ name = "Steffen Beyer" }]
 readme = "README.md"
 requires-python = ">=3.9,<4.0"
 dependencies = [
+  "kicad-python>=0.2.0",
 ]
 
 [dependency-groups]

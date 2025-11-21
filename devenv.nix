@@ -19,5 +19,18 @@
     cp -rv plugin.json requirements.txt icons *.py ui $PLUGIN_FOLDER
   '';
 
+  scripts.kicad-debug.exec = ''
+    # If you are on Windows, this variable is required to show any output
+    export KICAD_ALLOC_CONSOLE=1
+    # This enables KiCad's tracing system even when running a release build
+    export KICAD_ENABLE_WXTRACE=1
+    # This enables trace output for the API subsystem
+    export WXTRACE=KICAD_API
+    # API log to ~/Documents/kicad/9.0/logs/api.log
+    echo "EnableAPILogging=1" > ~/Library/Preferences/kicad/9.0/kicad_advanced
+
+    /Applications/KiCad/KiCad.app/Contents/MacOS/kicad
+  '';
+
   # See full reference at https://devenv.sh/reference/options/
 }

@@ -23,6 +23,7 @@ LAYER_CHOICES = [
 ]
 
 STATE_PATH = Path(__file__).with_name("kicandy_state.json")
+_WX_APP: wx.App | None = None
 
 
 class KicandyDialog(IconPickerDialog):
@@ -130,7 +131,18 @@ class KicandyDialog(IconPickerDialog):
         self.EndModal(wx.ID_OK)
 
 
+def _ensure_wx_app() -> wx.App:
+    global _WX_APP
+    app = wx.GetApp()
+    if app is not None:
+        return app
+    if _WX_APP is None:
+        _WX_APP = wx.App()
+    return _WX_APP
+
+
 def main() -> None:
+    _ensure_wx_app()
     dialog = KicandyDialog()
     try:
         dialog.ShowModal()
