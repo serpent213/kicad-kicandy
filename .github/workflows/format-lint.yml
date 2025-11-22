@@ -1,0 +1,37 @@
+name: Format and Lint
+
+on:
+  push:
+    branches:
+      - '**'
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  format_lint:
+    name: Run format check and lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v1
+        with:
+          version: '0.8.23'
+
+      - name: Install project dependencies
+        run: uv sync --frozen --group ci --no-default-groups
+
+      - name: Install just
+        uses: extractions/setup-just@v1
+
+      - name: Run format check and lint
+        run: just ci

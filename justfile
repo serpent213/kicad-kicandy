@@ -20,6 +20,11 @@ check:
   just lint
   @: # just test
 
+# Run Ruff format check plus lint
+ci:
+  uv run --group ci --no-default-groups ruff format --check .
+  uv run --group ci --no-default-groups ruff check --preview .
+
 # Format then apply Ruff auto-fixes (unsafe)
 fix:
   just format

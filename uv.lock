@@ -166,6 +166,9 @@ dependencies = [
 ]
 
 [package.dev-dependencies]
+ci = [
+    { name = "ruff" },
+]
 dev = [
     { name = "pyinstrument" },
     { name = "pytest", version = "8.4.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
@@ -181,6 +184,7 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
+ci = [{ name = "ruff", specifier = ">=0.3" }]
 dev = [
     { name = "pyinstrument", specifier = ">=5.1.1" },
     { name = "pytest", specifier = ">=8.3" },

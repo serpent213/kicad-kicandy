@@ -21,6 +21,9 @@ dev = [
   "ruff>=0.3",
   "wxPython>=4.2.1",
 ]
+ci = [
+  "ruff>=0.3",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["."]
