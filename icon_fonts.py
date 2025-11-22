@@ -472,7 +472,7 @@ class RemixIconFontSource(IconFontSource):
                 source_id=self.identifier,
                 display_name="Remix Icon",
                 style_label="Regular",
-                font_family="Remix Icon",
+                font_family="remixicon",
                 codepoints_resource=(
                     "https://raw.githubusercontent.com/Remix-Design/RemixIcon/refs/heads/master/fonts/remixicon.css"
                 ),

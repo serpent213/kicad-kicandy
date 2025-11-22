@@ -17,6 +17,7 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+  "hunter>=3.9.0",
   "pyinstrument>=5.1.1",
   "pytest>=8.3",
   "ruff>=0.3",

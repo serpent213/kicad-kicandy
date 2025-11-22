@@ -199,6 +199,7 @@ class KicandyDialog(IconPickerDialog):
         dialog.set_rows(self.font_manager.font_status_rows())
         dialog.ShowModal()
         dialog.Destroy()
+        self._reload_font_detection()
         self._refresh_icons()
 
     def _handle_manage_install(self, font_ids: Sequence[str], dialog: ManageIconSetsDialog) -> None:
@@ -224,10 +225,7 @@ class KicandyDialog(IconPickerDialog):
         finally:
             if progress_started:
                 dialog.hide_progress()
-            dialog.set_busy(False, "")
-            dialog.set_rows(self.font_manager.font_status_rows())
-        self._reload_font_detection()
-        self._refresh_icons()
+            dialog.set_busy(False, "Fonts installed. Close dialog to refresh font detection.")
         self.set_status("Fonts installed")
 
     def _handle_manage_uninstall(
@@ -239,17 +237,13 @@ class KicandyDialog(IconPickerDialog):
         try:
             removed = self.font_manager.uninstall_fonts(font_ids)
         except Exception as exc:  # pragma: no cover - wx runtime path
-            dialog.set_rows(self.font_manager.font_status_rows())
             dialog.set_busy(False, "")
             wx.MessageBox(str(exc), "Font removal failed", parent=self)
             return
-        dialog.set_rows(self.font_manager.font_status_rows())
         if not removed:
             dialog.set_busy(False, "No KiCandy-installed fonts were found.")
             return
-        dialog.set_busy(False, "")
-        self._reload_font_detection()
-        self._refresh_icons()
+        dialog.set_busy(False, "Fonts removed. Close dialog to refresh font detection.")
         self.set_status("Fonts removed")
 
     def _reload_font_detection(self) -> None:

@@ -53,6 +53,18 @@ searchable gallery of icons grouped by font style (Outlined, Rounded, Sharp).
   `/tmp/kicandy_profile.txt` (text) and `/tmp/kicandy_profile.html` (HTML) after
   the dialog closes, making it easy to analyze slow launches.
 
+### Debugging with Hunter
+
+- Add `hunter>=3.9.0` to `requirements.txt` (for KiCad to pick it up) to enable
+  optional execution tracing.
+- Import and call `start_trace()` and `stop_trace()` from `debug_log` in the
+  code sections you want to trace (typically in try/finally blocks).
+- When active, hunter writes detailed execution traces to
+  `/tmp/kicad-kicandy.trace` (filtered to non-stdlib code only), whilst debug
+  messages are logged to `/tmp/kicad-kicandy.log`.
+- This is primarily useful for diagnosing crashes or unexpected behaviour in
+  native code (wxPython, CoreText) where normal debugging tools fall short.
+
 ## Extending
 
 Icon fonts are defined via `IconFontSource` subclasses in `icon_fonts.py`. Each

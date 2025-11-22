@@ -4,8 +4,13 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import hunter
 
 _logger: logging.Logger | None = None
+_hunter_trace: hunter.Tracer | None = None
 
 
 def get_logger() -> logging.Logger:
@@ -31,3 +36,40 @@ def get_logger() -> logging.Logger:
     _logger.info("Debug logging initialized")
 
     return _logger
+
+
+def start_trace() -> None:
+    """Start Hunter trace to /tmp/kicad-kicandy.trace, filtering to project code only."""
+    global _hunter_trace
+    if _hunter_trace is not None:
+        return
+
+    import hunter
+
+    trace_file = Path("/tmp/kicad-kicandy.trace")
+    stream = trace_file.open("a", buffering=1, encoding="utf-8")
+
+    # Trace all function calls in non-stdlib code
+    _hunter_trace = hunter.trace(
+        ~hunter.Q(stdlib=True),
+        action=hunter.CallPrinter(stream=stream, force_colors=True),
+        threading_support=True,
+    )
+
+    logger = get_logger()
+    logger.info("Hunter trace started → /tmp/kicad-kicandy.trace")
+
+
+def stop_trace() -> None:
+    """Stop Hunter trace if running."""
+    global _hunter_trace
+    if _hunter_trace is None:
+        return
+
+    import hunter
+
+    hunter.stop()
+    _hunter_trace = None
+
+    logger = get_logger()
+    logger.info("Hunter trace stopped")
