@@ -377,6 +377,7 @@ class IconPickerDialog(wx.Dialog):
         root_sizer.Add(button_row, 0, wx.ALIGN_RIGHT | wx.ALL, 5)
 
         self.SetSizer(root_sizer)
+        self.SetAutoLayout(True)
         self.Layout()
 
         # Event wiring
@@ -387,6 +388,7 @@ class IconPickerDialog(wx.Dialog):
         self.add_button.Bind(wx.EVT_BUTTON, self._handle_add)
         self.font_size_slider.Bind(wx.EVT_SLIDER, self._handle_font_size_change)
         self.Bind(wx.EVT_CLOSE, self._handle_close)
+        self.Bind(wx.EVT_SIZE, self._handle_dialog_resize)
 
         self._update_font_size_label(self.font_size_slider.GetValue())
 
@@ -409,6 +411,10 @@ class IconPickerDialog(wx.Dialog):
 
     def _handle_search(self, _: wx.Event) -> None:
         self.on_search_changed(self.search_ctrl.GetValue())
+
+    def _handle_dialog_resize(self, event: wx.SizeEvent) -> None:
+        event.Skip()
+        self.Layout()
 
     def _handle_grid_selection(self, event: grid.GridEvent) -> None:
         event.Skip()
