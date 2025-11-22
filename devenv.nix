@@ -1,7 +1,15 @@
+{ pkgs, ... }:
 {
   # https://devenv.sh/basics/
   # Help the Python language server
   env.PYTHONPATH = "./.devenv/state/venv/lib/python3.13/site-packages";
+
+  # https://devenv.sh/packages/
+  packages =
+    with pkgs;
+    [
+      python313Packages.fonttools
+    ];
 
   # https://devenv.sh/languages/
   languages.python = {
