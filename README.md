@@ -4,6 +4,8 @@ KiCandy is a KiCad 9 Python action plugin that inserts Material Symbols glyphs a
 free silkscreen text. Instead of typing a Unicode character manually, you get a
 searchable gallery of icons grouped by font style (Outlined, Rounded, Sharp).
 
+![UI screenshot](docs/assets/screenshot.webp)
+
 ## Features
 
 - Search-as-you-type filtering with live updates as you toggle icon sets.
@@ -22,10 +24,11 @@ searchable gallery of icons grouped by font style (Outlined, Rounded, Sharp).
 
 ### Notes
 
-- The plugin expects the Material Symbols fonts to be available on the host OS.
-  Only the codepoint metadata is downloaded today, but the metadata in
-  `icon_fonts.py` already includes the TTF/WOFF2 URLs so font installation can
-  be added later.
+- Only tested on macOS so far.
+- The plugin expects the Material Symbols fonts to be available on the host OS,
+  the codepoint metadata is downloaded automatically.
+
+  Download TTFs from https://github.com/google/material-design-icons/tree/master/variablefont
 - Codepoint files are cached under `cache/` within the plugin directory. Delete
   the folder if you need to force a refresh.
 - Dialog state is stored in `cache/kicandy_state.json` (or the KiCad plugin

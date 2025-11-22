@@ -17,7 +17,7 @@
             "github": "serpent213"
         }
     },
-    "license": "Proprietary",
+    "license": "BSD-2-Clause",
     "resources": {
         "homepage": "https://github.com/serpent213/kicad-kicandy"
     },
