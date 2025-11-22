@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import platform
+import re
 import shutil
 import ssl
 import subprocess
@@ -331,6 +332,12 @@ class MaterialDesignIconsFontSource(IconFontSource):
 class RemixIconFontSource(IconFontSource):
     identifier = "remix-icon"
     install_url = "https://github.com/Remix-Design/RemixIcon"
+    _CSS_GLYPH_PATTERN = re.compile(
+        r"""
+        \.ri-([a-z0-9-]+):before\s*\{\s*content:\s*['\"]\\([0-9a-fA-F]+)['\"];?
+        """,
+        re.IGNORECASE | re.VERBOSE,
+    )
 
     def _build_fonts(self) -> tuple[IconFont, ...]:
         return (
@@ -339,14 +346,14 @@ class RemixIconFontSource(IconFontSource):
                 source_id=self.identifier,
                 display_name="Remix Icon",
                 style_label="Regular",
-                font_family="remixicon",
+                font_family="Remix Icon",
                 codepoints_resource=(
-                    "https://raw.githubusercontent.com/Remix-Design/RemixIcon/main/fonts/remixicon.woff2"
+                    "https://raw.githubusercontent.com/Remix-Design/RemixIcon/refs/heads/master/fonts/remixicon.css"
                 ),
                 font_files=(
                     IconFontFile(
                         url=(
-                            "https://github.com/Remix-Design/RemixIcon/raw/main/fonts/remixicon.ttf"
+                            "https://raw.githubusercontent.com/Remix-Design/RemixIcon/refs/heads/master/fonts/remixicon.ttf"
                         ),
                         format="ttf",
                     ),
@@ -355,10 +362,19 @@ class RemixIconFontSource(IconFontSource):
             ),
         )
 
-    def download_codepoints(
-        self, font: IconFont, destination: Path
-    ) -> None:  # pragma: no cover - stub
-        raise RuntimeError("Codepoint conversion for Remix Icon is not implemented yet.")
+    def download_codepoints(self, font: IconFont, destination: Path) -> None:
+        payload = _download_text_resource(font.codepoints_resource)
+        lines: list[str] = []
+        for match in self._CSS_GLYPH_PATTERN.finditer(payload):
+            name, codepoint = match.groups()
+            if not name or not codepoint:
+                continue
+            lines.append(f"{name} {codepoint.lower()}")
+
+        if not lines:
+            raise RuntimeError("No Remix Icon glyphs were extracted")
+
+        destination.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 ICON_FONT_SOURCES: tuple[IconFontSource, ...] = (

@@ -1,0 +1,7 @@
+/* Sample excerpt from Remix Icon CSS */
+
+.ri-24-hours-fill:before { content: "\ea01"; }
+.ri-24-hours-line:before { content: "\ea02"; }
+.ri-4k-fill:before { content: "\ea03"; }
+.ri-4k-line:before { content: "\ea04"; }
+.ri-a-b:before { content: "\ea05"; }

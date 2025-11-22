@@ -7,6 +7,7 @@ from icon_fonts import (
     DEFAULT_FONT_WEIGHT,
     FONT_WEIGHT_NAMES,
     MaterialDesignIconsFontSource,
+    RemixIconFontSource,
     resolve_weight_choice,
     weight_name_for_position,
     weight_position_for_name,
@@ -55,4 +56,26 @@ def test_material_design_icons_download_codepoints(
     assert lines == [
         "ab-testing F01C9",
         "abacus F16E0",
+    ]
+
+
+def test_remix_icon_download_codepoints(
+    tmp_path: Path, fixtures_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    css = (fixtures_path / "remixicon_sample.css").read_text(encoding="utf-8")
+    source = RemixIconFontSource()
+    font = source.fonts[0]
+
+    monkeypatch.setattr(icon_fonts, "_download_text_resource", lambda url: css)
+
+    destination = tmp_path / "remix.codepoints"
+    source.download_codepoints(font, destination)
+
+    lines = destination.read_text(encoding="utf-8").strip().splitlines()
+    assert lines == [
+        "24-hours-fill ea01",
+        "24-hours-line ea02",
+        "4k-fill ea03",
+        "4k-line ea04",
+        "a-b ea05",
     ]
