@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import weakref
 from pathlib import Path
 from typing import Protocol
 
@@ -48,6 +49,8 @@ class KicandyDialog(IconPickerDialog):
         self.repository = IconRepository()
         self.state = PluginState(STATE_PATH)
         self._last_download_failed = False
+        self._disconnect_handled = False
+        self._register_disconnect_handler()
 
         self._restore_state()
         # Initial refresh runs via the search control's EVT_TEXT fired during _restore_state.
@@ -148,6 +151,40 @@ class KicandyDialog(IconPickerDialog):
 
         self._persist_state()
         self.EndModal(wx.ID_OK)
+
+    def EndModal(self, ret_code: int) -> None:  # type: ignore[override]
+        self._disconnect_handled = True
+        super().EndModal(ret_code)
+
+    def _register_disconnect_handler(self) -> None:
+        on_disconnect = getattr(self.kicad, "on_disconnect", None)
+        if not callable(on_disconnect):
+            return
+
+        dialog_ref = weakref.ref(self)
+
+        def _handle_disconnect_callback() -> None:
+            dialog = dialog_ref()
+            if dialog is None:
+                return
+            if hasattr(dialog, "IsBeingDeleted") and dialog.IsBeingDeleted():
+                return
+            wx.CallAfter(dialog._handle_kicad_disconnect)
+
+        try:
+            on_disconnect(_handle_disconnect_callback)
+        except Exception:
+            pass
+
+    def _handle_kicad_disconnect(self) -> None:
+        if self._disconnect_handled:
+            return
+        if hasattr(self, "IsBeingDeleted") and self.IsBeingDeleted():
+            return
+        self._disconnect_handled = True
+        self.set_status("Lost connection to KiCad; closing")
+        self._persist_state()
+        self.EndModal(wx.ID_CANCEL)
 
 
 def _ensure_wx_app() -> wx.App:
