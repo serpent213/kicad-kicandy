@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import weakref
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
@@ -11,10 +12,12 @@ from kipy.board import BoardLayerClass
 from kipy.board_types import BoardLayer, BoardText
 from kipy.geometry import Vector2
 
-from icon_fonts import BOLD_FONT_WEIGHT, ICON_FONTS, IconFont
+from font_management import FontManager, fonts_pending_restart
+from icon_fonts import BOLD_FONT_WEIGHT, IconFont
 from icon_repository import IconDownloadError, IconGlyph, IconRepository, resolve_cache_dir
 from state_store import PluginState
 from ui.icon_picker_dialog import IconListRow, IconPickerDialog
+from ui.manage_icon_sets_dialog import ManageIconSetsDialog
 
 LAYER_CHOICES = [
     ("Front Silkscreen (F.SilkS)", BoardLayer.BL_F_SilkS),
@@ -34,12 +37,14 @@ class FontDetectionResult:
     failed_fonts: list[str]
 
 
-def _detect_available_fonts(repository: IconRepository) -> FontDetectionResult:
+def _detect_available_fonts(
+    repository: IconRepository, fonts: Sequence[IconFont]
+) -> FontDetectionResult:
     enumerator = wx.FontEnumerator()
     offered: list[IconFont] = []
     missing: list[str] = []
     failed: list[str] = []
-    for font in ICON_FONTS:
+    for font in fonts:
         label = f"{font.display_name} {font.style_label}"
         if not enumerator.IsValidFacename(font.font_family):
             missing.append(label)
@@ -68,7 +73,9 @@ class _Profiler(Protocol):
 class KicandyDialog(IconPickerDialog):
     def __init__(self) -> None:
         repository = IconRepository()
-        detection = _detect_available_fonts(repository)
+        self.state = PluginState(STATE_PATH)
+        self.font_manager = FontManager(repository, self.state)
+        detection = _detect_available_fonts(repository, self.font_manager.available_fonts())
         font_choices = [
             (font.identifier, f"{font.display_name} ({font.style_label})")
             for font in detection.offered_fonts
@@ -85,7 +92,6 @@ class KicandyDialog(IconPickerDialog):
         self.kicad = KiCad()
         self.board = self.kicad.get_board()
         self.repository = repository
-        self.state = PluginState(STATE_PATH)
         self._font_detection = detection
         self._offered_font_ids = [font.identifier for font in detection.offered_fonts]
         self._last_download_failed = False
@@ -110,6 +116,9 @@ class KicandyDialog(IconPickerDialog):
 
     def on_close_requested(self) -> None:
         self._persist_state()
+
+    def on_manage_fonts_requested(self) -> None:
+        self._open_manage_dialog()
 
     # --- Internal helpers ---------------------------------------------------
     def _restore_state(self) -> None:
@@ -182,6 +191,90 @@ class KicandyDialog(IconPickerDialog):
             for glyph in glyphs
         ]
         self.set_rows(rows)
+
+    def _open_manage_dialog(self) -> None:
+        dialog = ManageIconSetsDialog(self)
+        dialog.set_install_handler(lambda ids: self._handle_manage_install(ids, dialog))
+        dialog.set_uninstall_handler(lambda ids: self._handle_manage_uninstall(ids, dialog))
+        dialog.set_rows(self.font_manager.font_status_rows())
+        dialog.ShowModal()
+        dialog.Destroy()
+        self._refresh_icons()
+
+    def _handle_manage_install(self, font_ids: Sequence[str], dialog: ManageIconSetsDialog) -> None:
+        if not font_ids:
+            return
+        dialog.set_busy(True, "Installing fonts…")
+        progress_started = False
+
+        def _progress(completed: int, total: int) -> None:
+            nonlocal progress_started
+            if not progress_started:
+                self.show_status_progress(total)
+                progress_started = True
+            self.update_status_progress(completed)
+            dialog.set_busy(True, f"Downloading fonts ({completed}/{total})")
+            wx.YieldIfNeeded()
+
+        try:
+            self.set_status("Downloading fonts…")
+            self.font_manager.install_fonts(font_ids, progress_cb=_progress)
+        except Exception as exc:  # pragma: no cover - wx runtime path
+            wx.MessageBox(str(exc), "Font installation failed", parent=self)
+        finally:
+            if progress_started:
+                self.hide_status_progress()
+            dialog.set_busy(False, "")
+            dialog.set_rows(self.font_manager.font_status_rows())
+        self._reload_font_detection()
+        self._refresh_icons()
+        self.set_status("Fonts installed")
+
+    def _handle_manage_uninstall(
+        self, font_ids: Sequence[str], dialog: ManageIconSetsDialog
+    ) -> None:
+        if not font_ids:
+            return
+        dialog.set_busy(True, "Uninstalling fonts…")
+        try:
+            removed = self.font_manager.uninstall_fonts(font_ids)
+        except Exception as exc:  # pragma: no cover - wx runtime path
+            dialog.set_rows(self.font_manager.font_status_rows())
+            dialog.set_busy(False, "")
+            wx.MessageBox(str(exc), "Font removal failed", parent=self)
+            return
+        dialog.set_rows(self.font_manager.font_status_rows())
+        if not removed:
+            dialog.set_busy(False, "No KiCandy-installed fonts were found.")
+            return
+        dialog.set_busy(False, "")
+        self._reload_font_detection()
+        self._refresh_icons()
+        self.set_status("Fonts removed")
+
+    def _reload_font_detection(self) -> None:
+        detection = _detect_available_fonts(self.repository, self.font_manager.available_fonts())
+        self._font_detection = detection
+        self._offered_font_ids = [font.identifier for font in detection.offered_fonts]
+        font_choices = [
+            (font.identifier, f"{font.display_name} ({font.style_label})")
+            for font in detection.offered_fonts
+        ]
+        font_weights = {font.identifier: font.available_weights for font in detection.offered_fonts}
+        self.reset_fonts(font_choices, font_weights)
+        self._restore_font_selection()
+        self._update_weight_availability()
+
+    def _restore_font_selection(self) -> None:
+        for font_id in self._offered_font_ids:
+            enabled = self.state.model.enabled_fonts.get(font_id, True)
+            self.set_font_selected(font_id, enabled)
+
+    def set_status(self, message: str) -> None:  # type: ignore[override]
+        if fonts_pending_restart():
+            super().set_status("Restart KiCad to load newly installed fonts!")
+        else:
+            super().set_status(message)
 
     def _add_selected_icon(self) -> None:
         row = self.get_selected_row()

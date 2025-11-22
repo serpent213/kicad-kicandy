@@ -21,6 +21,7 @@ class DialogState:
     )
     font_size_mm: int = settings.DEFAULT_FONT_SIZE_MM
     font_weight: str = DEFAULT_FONT_WEIGHT
+    deleted_fonts: set[str] = field(default_factory=set)
 
 
 class PluginState:
@@ -59,6 +60,11 @@ class PluginState:
         if isinstance(stored_weight, str) and stored_weight in FONT_WEIGHT_NAMES:
             self.model.font_weight = stored_weight
 
+        stored_deleted = data.get("deleted_fonts")
+        if isinstance(stored_deleted, list):
+            valid = {value for value in stored_deleted if isinstance(value, str)}
+            self.model.deleted_fonts = valid
+
     def save(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         payload = {
@@ -67,6 +73,7 @@ class PluginState:
             "enabled_fonts": self.model.enabled_fonts,
             "font_size_mm": self.model.font_size_mm,
             "font_weight": self.model.font_weight,
+            "deleted_fonts": sorted(self.model.deleted_fonts),
         }
         self.path.write_text(json.dumps(payload, indent=2))
 
@@ -78,6 +85,7 @@ class PluginState:
         enabled_fonts: dict[str, bool],
         font_size_mm: int,
         font_weight: str,
+        deleted_fonts: set[str] | None = None,
     ) -> None:
         self.model.search = search
         self.model.layer = layer
@@ -91,4 +99,10 @@ class PluginState:
             self.model.font_weight = font_weight
         else:
             self.model.font_weight = DEFAULT_FONT_WEIGHT
+        if deleted_fonts is not None:
+            self.model.deleted_fonts = set(deleted_fonts)
+        self.save()
+
+    def update_deleted_fonts(self, deleted_fonts: set[str]) -> None:
+        self.model.deleted_fonts = set(deleted_fonts)
         self.save()

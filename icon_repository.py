@@ -146,6 +146,36 @@ class IconRepository:
             glyphs.extend(self._load_glyphs(font))
         return glyphs
 
+    def get_cache_path(self, font_id: str) -> Path | None:
+        font = self.fonts.get(font_id)
+        if font is None:
+            return None
+        return self._cache_path(font)
+
+    def has_cached_font(self, font_id: str) -> bool:
+        cache_path = self.get_cache_path(font_id)
+        if cache_path is None:
+            return False
+        return cache_path.exists()
+
+    def cached_glyph_count(self, font_id: str) -> int:
+        font = self.fonts.get(font_id)
+        if font is None:
+            return 0
+        cached_rows = self._glyph_cache.get(font.identifier)
+        if cached_rows is not None:
+            return len(cached_rows)
+        cache_path = self._cache_path(font)
+        if not cache_path.exists():
+            return 0
+        try:
+            data = cache_path.read_text(encoding="utf-8")
+        except OSError:
+            return 0
+        glyphs = self._parse_codepoints(data, font)
+        self._glyph_cache[font.identifier] = glyphs
+        return len(glyphs)
+
     def search(self, font_ids: Iterable[str], query: str) -> list[IconGlyph]:
         glyphs = self.get_glyphs(font_ids)
         tokens = [token for token in query.lower().split() if token]

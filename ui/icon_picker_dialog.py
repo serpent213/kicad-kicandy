@@ -285,21 +285,11 @@ class IconPickerDialog(wx.Dialog):
             style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER,
         )
 
-        self.fonts = list(fonts)
         self.layers = list(layers)
         self._font_checkboxes: dict[str, wx.CheckBox] = {}
         self._font_render_map: dict[tuple[str, str, int, str], wx.Font] = {}
-        resolved_weights = font_weights or {}
         self._font_weights: dict[str, tuple[str, ...]] = {}
-        for identifier, _ in self.fonts:
-            available = tuple(
-                weight
-                for weight in resolved_weights.get(identifier, (DEFAULT_FONT_WEIGHT,))
-                if weight in FONT_WEIGHT_NAMES
-            )
-            if not available:
-                available = (DEFAULT_FONT_WEIGHT,)
-            self._font_weights[identifier] = available
+        self._set_font_metadata(fonts, font_weights)
         self._default_preview_font = wx.Font(wx.FontInfo(96))
 
         self._build_ui()
@@ -311,11 +301,26 @@ class IconPickerDialog(wx.Dialog):
         self.SetSize(wx.Size(800, 600))
         root_sizer = wx.BoxSizer(wx.VERTICAL)
 
-        # Search controls
+        # Search controls with weight switch and management button
         search_sizer = wx.BoxSizer(wx.HORIZONTAL)
         self.search_ctrl = wx.SearchCtrl(self, style=wx.TE_PROCESS_ENTER)
         self.search_ctrl.SetDescriptiveText("Search icons…")
+        self.search_ctrl.SetMinSize(wx.Size(220, -1))
         search_sizer.Add(self.search_ctrl, 1, wx.ALL | wx.EXPAND, 5)
+
+        self.weight_checkbox = wx.CheckBox(self, label="Bold")
+        self.weight_checkbox.Disable()
+        search_sizer.Add(
+            self.weight_checkbox, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT | wx.TOP | wx.BOTTOM, 5
+        )
+
+        self.manage_fonts_button = wx.Button(self, label="Manage Icon Sets")
+        search_sizer.Add(
+            self.manage_fonts_button,
+            0,
+            wx.ALIGN_CENTER_VERTICAL | wx.RIGHT | wx.TOP | wx.BOTTOM,
+            5,
+        )
         root_sizer.Add(search_sizer, 0, wx.EXPAND)
 
         # Font filters
@@ -325,15 +330,6 @@ class IconPickerDialog(wx.Dialog):
         self.font_grid.AddGrowableCol(0)
         font_sizer.Add(self.font_grid, 1, wx.ALL | wx.EXPAND, 5)
         root_sizer.Add(font_sizer, 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 5)
-
-        # Weight selector
-        weight_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        self.weight_label = wx.StaticText(self, label="Weight")
-        weight_sizer.Add(self.weight_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.LEFT | wx.RIGHT, 5)
-        self.weight_checkbox = wx.CheckBox(self, label=DEFAULT_FONT_WEIGHT)
-        self.weight_checkbox.Disable()
-        weight_sizer.Add(self.weight_checkbox, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
-        root_sizer.Add(weight_sizer, 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 5)
 
         # Icon list + preview panel
         content_sizer = wx.BoxSizer(wx.HORIZONTAL)
@@ -369,7 +365,11 @@ class IconPickerDialog(wx.Dialog):
         # Status, size and layer selection
         status_row = wx.BoxSizer(wx.HORIZONTAL)
         self.status_text = wx.StaticText(self, label="Ready")
-        status_row.Add(self.status_text, 1, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
+        status_row.Add(self.status_text, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
+
+        self.status_gauge = wx.Gauge(self, range=100, style=wx.GA_HORIZONTAL)
+        self.status_gauge.Hide()
+        status_row.Add(self.status_gauge, 1, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 10)
 
         # Font size sizer with proper centering
         font_size_sizer = wx.BoxSizer(wx.HORIZONTAL)
@@ -428,11 +428,11 @@ class IconPickerDialog(wx.Dialog):
         self.add_button.Bind(wx.EVT_BUTTON, self._handle_add)
         self.font_size_slider.Bind(wx.EVT_SLIDER, self._handle_font_size_change)
         self.weight_checkbox.Bind(wx.EVT_CHECKBOX, self._handle_weight_change)
+        self.manage_fonts_button.Bind(wx.EVT_BUTTON, self._handle_manage_fonts)
         self.Bind(wx.EVT_CLOSE, self._handle_close)
         self.Bind(wx.EVT_SIZE, self._handle_dialog_resize)
 
         self._update_font_size_label(self.font_size_slider.GetValue())
-        self._update_weight_label()
 
     def _populate_fonts(self) -> None:
         for identifier, label in self.fonts:
@@ -446,21 +446,31 @@ class IconPickerDialog(wx.Dialog):
             self._font_checkboxes[identifier] = checkbox
         self._update_weight_availability()
 
+    def reset_fonts(
+        self,
+        fonts: Sequence[tuple[str, str]],
+        font_weights: Mapping[str, Sequence[str]] | None = None,
+    ) -> None:
+        for checkbox in self._font_checkboxes.values():
+            checkbox.Destroy()
+        self._font_checkboxes.clear()
+        self.font_grid.Clear(True)
+        self._set_font_metadata(fonts, font_weights)
+        self._populate_fonts()
+        self.Layout()
+
     def _handle_font_checkbox(self, font_id: str, event: wx.CommandEvent) -> None:
         self.on_font_toggled(font_id, event.IsChecked())
         self._update_weight_availability()
 
     def _update_weight_availability(self) -> None:
         supports_bold = self._selected_fonts_support_bold()
-        was_enabled = self.weight_checkbox.IsEnabled()
         current_value = self.weight_checkbox.GetValue()
         self.weight_checkbox.Enable(supports_bold)
         value_changed = False
         if not supports_bold and current_value:
             self.weight_checkbox.SetValue(False)
             value_changed = True
-        if value_changed or was_enabled != supports_bold:
-            self._update_weight_label()
         if value_changed:
             self.icon_grid.ForceRefresh()
             self._update_preview(self.get_selected_row())
@@ -503,10 +513,12 @@ class IconPickerDialog(wx.Dialog):
         self._update_font_size_label(self.font_size_slider.GetValue())
 
     def _handle_weight_change(self, _: wx.CommandEvent) -> None:
-        self._update_weight_label()
         self.icon_grid.ForceRefresh()
         self._update_preview(self.get_selected_row())
         self.on_weight_changed(self.get_font_weight())
+
+    def _handle_manage_fonts(self, _: wx.CommandEvent) -> None:
+        self.on_manage_fonts_requested()
 
     def _update_icon_activated(self) -> None:
         row = self.get_selected_row()
@@ -551,6 +563,25 @@ class IconPickerDialog(wx.Dialog):
     # --- Helpers for controller code -----------------------------------------
     def set_status(self, message: str) -> None:
         self.status_text.SetLabel(message)
+
+    def show_status_progress(self, total: int) -> None:
+        maximum = max(1, total)
+        self.status_gauge.SetRange(maximum)
+        self.status_gauge.SetValue(0)
+        self.status_gauge.Show()
+        self.Layout()
+
+    def update_status_progress(self, value: int) -> None:
+        if not self.status_gauge.IsShown():
+            return
+        clamped = max(0, min(value, self.status_gauge.GetRange()))
+        self.status_gauge.SetValue(clamped)
+
+    def hide_status_progress(self) -> None:
+        if not self.status_gauge.IsShown():
+            return
+        self.status_gauge.Hide()
+        self.Layout()
 
     def set_font_selected(self, font_id: str, enabled: bool) -> None:
         checkbox = self._font_checkboxes.get(font_id)
@@ -600,7 +631,6 @@ class IconPickerDialog(wx.Dialog):
 
     def set_font_weight(self, weight_name: str) -> None:
         self.weight_checkbox.SetValue(weight_name == BOLD_FONT_WEIGHT)
-        self._update_weight_label()
 
     def get_font_weight(self) -> str:
         if self.weight_checkbox.GetValue():
@@ -634,5 +664,23 @@ class IconPickerDialog(wx.Dialog):
     def _update_font_size_label(self, value: int) -> None:
         self.font_size_value.SetLabel(f"{value} mm")
 
-    def _update_weight_label(self) -> None:
-        self.weight_checkbox.SetLabel(self.get_font_weight())
+    def on_manage_fonts_requested(self) -> None:  # pragma: no cover - virtual
+        pass
+
+    def _set_font_metadata(
+        self,
+        fonts: Sequence[tuple[str, str]],
+        font_weights: Mapping[str, Sequence[str]] | None,
+    ) -> None:
+        self.fonts = list(fonts)
+        resolved_weights = font_weights or {}
+        self._font_weights.clear()
+        for identifier, _ in self.fonts:
+            available = tuple(
+                weight
+                for weight in resolved_weights.get(identifier, (DEFAULT_FONT_WEIGHT,))
+                if weight in FONT_WEIGHT_NAMES
+            )
+            if not available:
+                available = (DEFAULT_FONT_WEIGHT,)
+            self._font_weights[identifier] = available
