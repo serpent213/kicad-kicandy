@@ -7,6 +7,9 @@ if [ -z "${VERSION}" ]; then
   exit 1
 fi
 
+VERSION_TAG="${VERSION}"
+VERSION="${VERSION#[Vv]}"
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 ARCHIVE_ROOT="${SCRIPT_DIR}/archive"
@@ -58,7 +61,8 @@ echo "Creating PCM archive"
 echo "Gathering archive metadata"
 DOWNLOAD_SHA256=$(shasum --algorithm 256 "${ZIP_PATH}" | awk '{print $1}')
 DOWNLOAD_SIZE=$(wc -c < "${ZIP_PATH}" | awk '{print $1}')
-INSTALL_SIZE=$(python3 - <<'PY'
+INSTALL_SIZE=$(
+  python3 - "${ZIP_PATH}" <<'PY'
 import sys
 import zipfile
 
@@ -66,8 +70,8 @@ zip_path = sys.argv[1]
 with zipfile.ZipFile(zip_path) as zf:
     print(sum(info.file_size for info in zf.infolist()))
 PY
-"${ZIP_PATH}")
-DOWNLOAD_URL="https://github.com/${REPO_SLUG}/releases/download/${VERSION}/${ZIP_BASENAME}"
+)
+DOWNLOAD_URL="https://github.com/${REPO_SLUG}/releases/download/${VERSION_TAG}/${ZIP_BASENAME}"
 
 if [ -n "${GITHUB_ENV:-}" ]; then
   {

@@ -34,8 +34,8 @@ jobs:
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: ./PCM/KiCandy-PCM-${{ steps.latest-release.outputs.tag }}.zip
-          asset_name: KiCandy-PCM-${{ steps.latest-release.outputs.tag }}.zip
+          file: ./PCM/KiCandy-PCM-${{ env.VERSION }}.zip
+          asset_name: KiCandy-PCM-${{ env.VERSION }}.zip
           overwrite: true
           tag: ${{ steps.latest-release.outputs.tag }}
 
