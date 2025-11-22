@@ -1,4 +1,4 @@
-name: Format and Lint
+name: Lint & Test
 
 on:
   push:
@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   format_lint:
-    name: Run format check and lint
+    name: Run format check, lint and full tests
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -33,5 +33,5 @@ jobs:
       - name: Install just
         uses: extractions/setup-just@v1
 
-      - name: Run format check and lint
+      - name: Run format check, lint and tests
         run: just ci

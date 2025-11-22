@@ -56,3 +56,29 @@ source provides metadata for one family (with optional styles), a
 `download_codepoints` implementation, and inherits the built-in TTF installer
 logic. Append new sources to `ICON_FONT_SOURCES` and KiCandy will offer them as
 soon as wxPython can see the font family and the codepoints can be cached.
+
+## Testing
+
+- Run `just test` to execute the default pytest suite. These tests avoid the
+  KiCad runtime entirely by targeting pure-Python helpers such as
+  `icon_repository.py` and `state_store.py`.
+- The repository includes `tests/fixtures/material_symbols_outlined_sample.codepoints`,
+  a trimmed codepoints file that exercises parsing, searching, and cache
+  behavior without requiring a network download.
+- API-heavy bits can be tested by creating lightweight stand-ins for KiCad or
+  icon font sources. See `RecordingFontSource` in
+  `tests/test_icon_repository.py` for an example of mocking only the
+  `download_codepoints` method.
+
+### Download tests
+
+Tests marked with `@pytest.mark.download` perform live downloads from the
+upstream Material Symbols repository. They are skipped by default to keep the
+offline suite fast and deterministic; run them explicitly with:
+
+```
+just test-dl
+```
+
+These tests double-check that the real GitHub-hosted codepoint files can still
+be fetched and searched without needing KiCad to be installed.

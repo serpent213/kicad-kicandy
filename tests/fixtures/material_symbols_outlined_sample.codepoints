@@ -1,0 +1,8 @@
+# Sample entries taken from the upstream Material Symbols Outlined codepoints.
+# These lines enable offline parsing tests without downloading full metadata.
+
+10k e951
+10mp e952
+360 e577
+ac_unit eb3b
+bolt ea0b
