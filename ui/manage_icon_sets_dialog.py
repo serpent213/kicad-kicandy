@@ -115,11 +115,11 @@ class ManageIconSetsDialog(wx.Dialog):
         self._update_button_states()
 
     def _font_installed_label(self, row: FontStatusRow) -> str:
-        if not row.wx_available:
-            return "No"
-        if row.uninstallable:
+        if row.is_installed:
             return "User"
-        return "System"
+        if row.wx_available:
+            return "System"
+        return "No"
 
     def set_busy(self, busy: bool, message: str = "") -> None:
         self._busy = busy
