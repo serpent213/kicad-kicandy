@@ -172,7 +172,7 @@ class IconGrid(grid.Grid):
         self,
         parent: wx.Window,
         font_lookup: Callable[[str, int], wx.Font | None],
-        min_cell: int = 96,
+        min_cell: int = settings.ICON_GRID_MIN_CELL_PX,
     ) -> None:
         super().__init__(parent, style=wx.BORDER_THEME)
         self._font_lookup = font_lookup
