@@ -9,11 +9,10 @@ import wx.grid as grid
 
 import settings
 from icon_fonts import (
+    BOLD_FONT_WEIGHT,
     DEFAULT_FONT_WEIGHT,
     FONT_WEIGHT_NAMES,
     resolve_weight_choice,
-    weight_name_for_position,
-    weight_position_for_name,
 )
 
 
@@ -331,20 +330,9 @@ class IconPickerDialog(wx.Dialog):
         weight_sizer = wx.BoxSizer(wx.HORIZONTAL)
         self.weight_label = wx.StaticText(self, label="Weight")
         weight_sizer.Add(self.weight_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.LEFT | wx.RIGHT, 5)
-        self.weight_slider = wx.Slider(
-            self,
-            value=weight_position_for_name(DEFAULT_FONT_WEIGHT),
-            minValue=1,
-            maxValue=len(FONT_WEIGHT_NAMES),
-            style=wx.SL_HORIZONTAL,
-        )
-        self.weight_slider.SetMinSize(wx.Size(200, -1))
-        self.weight_slider.SetTickFreq(1)
-        self.weight_slider.SetLineSize(1)
-        self.weight_slider.SetPageSize(1)
-        weight_sizer.Add(self.weight_slider, 1, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
-        self.weight_value = wx.StaticText(self, label="")
-        weight_sizer.Add(self.weight_value, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
+        self.weight_checkbox = wx.CheckBox(self, label=DEFAULT_FONT_WEIGHT)
+        self.weight_checkbox.Disable()
+        weight_sizer.Add(self.weight_checkbox, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
         root_sizer.Add(weight_sizer, 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 5)
 
         # Icon list + preview panel
@@ -439,12 +427,12 @@ class IconPickerDialog(wx.Dialog):
         self.icon_grid.Bind(grid.EVT_GRID_CELL_LEFT_DCLICK, self._handle_icon_activated)
         self.add_button.Bind(wx.EVT_BUTTON, self._handle_add)
         self.font_size_slider.Bind(wx.EVT_SLIDER, self._handle_font_size_change)
-        self.weight_slider.Bind(wx.EVT_SLIDER, self._handle_weight_change)
+        self.weight_checkbox.Bind(wx.EVT_CHECKBOX, self._handle_weight_change)
         self.Bind(wx.EVT_CLOSE, self._handle_close)
         self.Bind(wx.EVT_SIZE, self._handle_dialog_resize)
 
         self._update_font_size_label(self.font_size_slider.GetValue())
-        self._update_weight_label(self.weight_slider.GetValue())
+        self._update_weight_label()
 
     def _populate_fonts(self) -> None:
         for identifier, label in self.fonts:
@@ -452,10 +440,37 @@ class IconPickerDialog(wx.Dialog):
             checkbox.SetValue(True)
             checkbox.Bind(
                 wx.EVT_CHECKBOX,
-                lambda event, font_id=identifier: self.on_font_toggled(font_id, event.IsChecked()),
+                lambda event, font_id=identifier: self._handle_font_checkbox(font_id, event),
             )
             self.font_grid.Add(checkbox, 0, wx.ALL, 2)
             self._font_checkboxes[identifier] = checkbox
+        self._update_weight_availability()
+
+    def _handle_font_checkbox(self, font_id: str, event: wx.CommandEvent) -> None:
+        self.on_font_toggled(font_id, event.IsChecked())
+        self._update_weight_availability()
+
+    def _update_weight_availability(self) -> None:
+        supports_bold = self._selected_fonts_support_bold()
+        was_enabled = self.weight_checkbox.IsEnabled()
+        current_value = self.weight_checkbox.GetValue()
+        self.weight_checkbox.Enable(supports_bold)
+        value_changed = False
+        if not supports_bold and current_value:
+            self.weight_checkbox.SetValue(False)
+            value_changed = True
+        if value_changed or was_enabled != supports_bold:
+            self._update_weight_label()
+        if value_changed:
+            self.icon_grid.ForceRefresh()
+            self._update_preview(self.get_selected_row())
+
+    def _selected_fonts_support_bold(self) -> bool:
+        for font_id in self.get_enabled_fonts():
+            available = self._font_weights.get(font_id, (DEFAULT_FONT_WEIGHT,))
+            if BOLD_FONT_WEIGHT in available:
+                return True
+        return False
 
     def _populate_layers(self) -> None:
         for label, payload in self.layers:
@@ -488,11 +503,10 @@ class IconPickerDialog(wx.Dialog):
         self._update_font_size_label(self.font_size_slider.GetValue())
 
     def _handle_weight_change(self, _: wx.CommandEvent) -> None:
-        value = self.weight_slider.GetValue()
-        self._update_weight_label(value)
+        self._update_weight_label()
         self.icon_grid.ForceRefresh()
         self._update_preview(self.get_selected_row())
-        self.on_weight_changed(weight_name_for_position(value))
+        self.on_weight_changed(self.get_font_weight())
 
     def _update_icon_activated(self) -> None:
         row = self.get_selected_row()
@@ -540,8 +554,10 @@ class IconPickerDialog(wx.Dialog):
 
     def set_font_selected(self, font_id: str, enabled: bool) -> None:
         checkbox = self._font_checkboxes.get(font_id)
-        if checkbox is not None:
-            checkbox.SetValue(enabled)
+        if checkbox is None:
+            return
+        checkbox.SetValue(enabled)
+        self._update_weight_availability()
 
     def get_enabled_fonts(self) -> list[str]:
         result = []
@@ -583,12 +599,13 @@ class IconPickerDialog(wx.Dialog):
         return self.font_size_slider.GetValue()
 
     def set_font_weight(self, weight_name: str) -> None:
-        value = weight_position_for_name(weight_name)
-        self.weight_slider.SetValue(value)
-        self._update_weight_label(value)
+        self.weight_checkbox.SetValue(weight_name == BOLD_FONT_WEIGHT)
+        self._update_weight_label()
 
     def get_font_weight(self) -> str:
-        return weight_name_for_position(self.weight_slider.GetValue())
+        if self.weight_checkbox.GetValue():
+            return BOLD_FONT_WEIGHT
+        return DEFAULT_FONT_WEIGHT
 
     def get_resolved_font_weight(self, font_id: str) -> str:
         available = self._font_weights.get(font_id, (DEFAULT_FONT_WEIGHT,))
@@ -617,6 +634,5 @@ class IconPickerDialog(wx.Dialog):
     def _update_font_size_label(self, value: int) -> None:
         self.font_size_value.SetLabel(f"{value} mm")
 
-    def _update_weight_label(self, value: int) -> None:
-        name = weight_name_for_position(value)
-        self.weight_value.SetLabel(f"{value} – {name}")
+    def _update_weight_label(self) -> None:
+        self.weight_checkbox.SetLabel(self.get_font_weight())

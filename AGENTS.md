@@ -19,6 +19,8 @@
 - Use descriptive module-level names (`icon_repository`, not abbreviations).
 - wxPython UI classes should end with `Dialog` or `Panel` to match current patterns.
 - Persist user-visible strings in `README.md` or dedicated resources to keep code minimal.
+- KiCad only differentiates Regular vs Bold weights—use the `BOLD_FONT_WEIGHT`
+  constant and keep the UI’s bold checkbox logic in sync with README guidance.
 
 ## Testing Guidelines
 - Pytest is the standard harness; name files `test_*.py` and functions `test_*`.

@@ -16,7 +16,8 @@ searchable gallery of icons grouped by font style (Outlined, Rounded, Sharp).
 
 1. Load a PCB in KiCad 9 and run the **Insert Icon Text** action.
 2. Type to search or toggle the icon family checkboxes. The list updates as you
-   type; enabling at least one font is required.
+   type; enabling at least one font is required. Flip the **Bold** checkbox when
+   it is enabled to switch between Regular and Bold glyphs.
 3. Select the target silkscreen layer, highlight an icon, and press **Add Icon**
    (or double-click the row).
 4. A `BoardText` item containing the glyph is created and pushed into an
@@ -29,6 +30,9 @@ searchable gallery of icons grouped by font style (Outlined, Rounded, Sharp).
   cached codepoint metadata. Install the desired fonts (Material Symbols,
   Material Design Icons, Remix Icon, …) before launching KiCandy; the plugin
   copies codepoints into its cache automatically.
+- KiCad only supports Regular/Bold text weights, so the dialog exposes a simple
+  **Bold** checkbox instead of a slider; the checkbox is present whenever at
+  least one selected icon family ships a bold weight.
 
   Download Material Symbols TTFs from
   https://github.com/google/material-design-icons/tree/master/variablefont and

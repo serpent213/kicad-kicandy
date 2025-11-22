@@ -37,6 +37,7 @@ FONT_WEIGHT_NAMES: tuple[str, ...] = (
 )
 
 DEFAULT_FONT_WEIGHT = "Regular"
+BOLD_FONT_WEIGHT = "Bold"
 _FONT_WEIGHT_INDEX = {name: index for index, name in enumerate(FONT_WEIGHT_NAMES, start=1)}
 
 

@@ -11,7 +11,7 @@ from kipy.board import BoardLayerClass
 from kipy.board_types import BoardLayer, BoardText
 from kipy.geometry import Vector2
 
-from icon_fonts import ICON_FONTS, IconFont
+from icon_fonts import BOLD_FONT_WEIGHT, ICON_FONTS, IconFont
 from icon_repository import IconDownloadError, IconGlyph, IconRepository, resolve_cache_dir
 from state_store import PluginState
 from ui.icon_picker_dialog import IconListRow, IconPickerDialog
@@ -201,6 +201,8 @@ class KicandyDialog(IconPickerDialog):
         text.attributes.font_name = glyph.font_family
         font_size_mm = self.get_font_size_mm()
         text.attributes.size = Vector2.from_xy_mm(font_size_mm, font_size_mm)
+        resolved_weight = self.get_resolved_font_weight(glyph.font_id)
+        text.attributes.bold = resolved_weight == BOLD_FONT_WEIGHT
         text.attributes.mirrored = layer == BoardLayer.BL_B_SilkS
 
         created = self.board.create_items(text)
