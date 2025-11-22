@@ -25,11 +25,16 @@ searchable gallery of icons grouped by font style (Outlined, Rounded, Sharp).
 ### Notes
 
 - Only tested on macOS so far.
-- The plugin expects the Material Symbols fonts to be available on the host OS,
-  the codepoint metadata is downloaded automatically.
+- The dialog only offers icon sets that are installed on the host OS and have
+  cached codepoint metadata. Install the desired fonts (Material Symbols,
+  Material Design Icons, Remix Icon, …) before launching KiCandy; the plugin
+  copies codepoints into its cache automatically.
 
-  Download TTFs from https://github.com/google/material-design-icons/tree/master/variablefont
-  and install on macOS using *Font Book*, for example.
+  Download Material Symbols TTFs from
+  https://github.com/google/material-design-icons/tree/master/variablefont and
+  install them using *Font Book* (macOS) or by copying into
+  `%LocalAppData%\Microsoft\Windows\Fonts` and adding the matching registry
+  entries.
 - Codepoint files are cached under `cache/` within the plugin directory. Delete
   the folder if you need to force a refresh.
 - Dialog state is stored in `cache/kicandy_state.json` (or the KiCad plugin
@@ -46,8 +51,8 @@ searchable gallery of icons grouped by font style (Outlined, Rounded, Sharp).
 
 ## Extending
 
-To add new icon sets, append entries to `ICON_FONTS` in `icon_fonts.py`. Provide
-the human-readable name, style label, system font family, and download URLs for
-both the codepoint file and any font binaries you want to expose later. The
-dialog builds its checkbox list directly from this metadata so new sets will
-appear automatically.
+Icon fonts are defined via `IconFontSource` subclasses in `icon_fonts.py`. Each
+source provides metadata for one family (with optional styles), a
+`download_codepoints` implementation, and inherits the built-in TTF installer
+logic. Append new sources to `ICON_FONT_SOURCES` and KiCandy will offer them as
+soon as wxPython can see the font family and the codepoints can be cached.

@@ -3,16 +3,11 @@
 from __future__ import annotations
 
 import os
-import ssl
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
 
-import certifi
-
-from icon_fonts import ICON_FONTS, IconFont
+from icon_fonts import ICON_FONT_SOURCES, ICON_FONTS, IconFont, IconFontSource
 
 
 class IconRepositoryError(RuntimeError):
@@ -34,9 +29,6 @@ class IconGlyph:
     search_target: str
 
 
-_SSL_CONTEXT = ssl.create_default_context(cafile=certifi.where())
-
-
 def resolve_cache_dir(cache_dir: Path | None = None) -> Path:
     if cache_dir is None:
         cache_home = os.environ.get("KICAD_CACHE_HOME")
@@ -55,11 +47,19 @@ def resolve_cache_dir(cache_dir: Path | None = None) -> Path:
 
 class IconRepository:
     def __init__(
-        self, cache_dir: Path | None = None, fonts: Sequence[IconFont] | None = None
+        self,
+        cache_dir: Path | None = None,
+        fonts: Sequence[IconFont] | None = None,
+        font_sources: Sequence[IconFontSource] | None = None,
     ) -> None:
         resolved_cache_dir = resolve_cache_dir(cache_dir)
         self.cache_dir = resolved_cache_dir
-        self.fonts = {font.identifier: font for font in (fonts or ICON_FONTS)}
+        resolved_sources = font_sources or ICON_FONT_SOURCES
+        self.sources: dict[str, IconFontSource] = {
+            source.identifier: source for source in resolved_sources
+        }
+        resolved_fonts = fonts or ICON_FONTS
+        self.fonts = {font.identifier: font for font in resolved_fonts}
         self._glyph_cache: dict[str, list[IconGlyph]] = {}
 
     def _cache_path(self, font: IconFont) -> Path:
@@ -67,12 +67,21 @@ class IconRepository:
         return self.cache_dir / f"{safe_identifier}.codepoints"
 
     def _download(self, font: IconFont, destination: Path) -> None:
-        request = Request(font.codepoints_url, headers={"User-Agent": "kicandy-icon-fetcher"})
+        source = self.sources.get(font.source_id)
+        if source is None:
+            raise IconDownloadError(
+                f"No font source registered for {font.identifier} ({font.source_id})"
+            )
         try:
-            with urlopen(request, timeout=10, context=_SSL_CONTEXT) as response:
-                destination.write_bytes(response.read())
-        except (URLError, HTTPError) as exc:
-            raise IconDownloadError(f"Unable to download {font.codepoints_url}: {exc}") from exc
+            source.download_codepoints(font, destination)
+        except IconDownloadError:
+            raise
+        except IconRepositoryError:
+            raise
+        except Exception as exc:  # pragma: no cover - provider specific failure
+            raise IconDownloadError(
+                f"Unable to download codepoints for {font.identifier}: {exc}"
+            ) from exc
 
     def _parse_codepoints(self, data: str, font: IconFont) -> list[IconGlyph]:
         glyphs: list[IconGlyph] = []
@@ -117,6 +126,16 @@ class IconRepository:
     def ensure_fonts(self, refresh: bool = False) -> None:
         for font in self.fonts.values():
             self._load_glyphs(font, force_refresh=refresh)
+
+    def ensure_font(self, font_id: str, refresh: bool = False) -> bool:
+        font = self.fonts.get(font_id)
+        if font is None:
+            return False
+        try:
+            self._load_glyphs(font, force_refresh=refresh)
+        except IconDownloadError:
+            return False
+        return True
 
     def get_glyphs(self, font_ids: Iterable[str]) -> list[IconGlyph]:
         glyphs: list[IconGlyph] = []

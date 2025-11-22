@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import weakref
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
@@ -10,14 +11,10 @@ from kipy.board import BoardLayerClass
 from kipy.board_types import BoardLayer, BoardText
 from kipy.geometry import Vector2
 
-from icon_fonts import ICON_FONTS
+from icon_fonts import ICON_FONTS, IconFont
 from icon_repository import IconDownloadError, IconGlyph, IconRepository, resolve_cache_dir
 from state_store import PluginState
 from ui.icon_picker_dialog import IconListRow, IconPickerDialog
-
-FONT_CHOICES = [
-    (font.identifier, f"{font.display_name} ({font.style_label})") for font in ICON_FONTS
-]
 
 LAYER_CHOICES = [
     ("Front Silkscreen (F.SilkS)", BoardLayer.BL_F_SilkS),
@@ -28,6 +25,34 @@ STATE_PATH = resolve_cache_dir() / "kicandy_state.json"
 PROFILE_TXT_OUTPUT_PATH = Path("/tmp/kicandy_profile.txt")
 PROFILE_HTML_OUTPUT_PATH = Path("/tmp/kicandy_profile.html")
 _WX_APP: wx.App | None = None
+
+
+@dataclass
+class FontDetectionResult:
+    offered_fonts: list[IconFont]
+    missing_fonts: list[str]
+    failed_fonts: list[str]
+
+
+def _detect_available_fonts(repository: IconRepository) -> FontDetectionResult:
+    enumerator = wx.FontEnumerator()
+    offered: list[IconFont] = []
+    missing: list[str] = []
+    failed: list[str] = []
+    for font in ICON_FONTS:
+        label = f"{font.display_name} {font.style_label}"
+        if not enumerator.IsValidFacename(font.font_family):
+            missing.append(label)
+            continue
+        if not repository.ensure_font(font.identifier):
+            failed.append(label)
+            continue
+        offered.append(font)
+    return FontDetectionResult(
+        offered_fonts=offered,
+        missing_fonts=missing,
+        failed_fonts=failed,
+    )
 
 
 class _Profiler(Protocol):
@@ -42,12 +67,21 @@ class _Profiler(Protocol):
 
 class KicandyDialog(IconPickerDialog):
     def __init__(self) -> None:
-        super().__init__(fonts=FONT_CHOICES, layers=LAYER_CHOICES, parent=None)
+        repository = IconRepository()
+        detection = _detect_available_fonts(repository)
+        font_choices = [
+            (font.identifier, f"{font.display_name} ({font.style_label})")
+            for font in detection.offered_fonts
+        ]
+
+        super().__init__(fonts=font_choices, layers=LAYER_CHOICES, parent=None)
 
         self.kicad = KiCad()
         self.board = self.kicad.get_board()
-        self.repository = IconRepository()
+        self.repository = repository
         self.state = PluginState(STATE_PATH)
+        self._font_detection = detection
+        self._offered_font_ids = [font.identifier for font in detection.offered_fonts]
         self._last_download_failed = False
         self._disconnect_handled = False
         self._register_disconnect_handler()
@@ -74,7 +108,8 @@ class KicandyDialog(IconPickerDialog):
     # --- Internal helpers ---------------------------------------------------
     def _restore_state(self) -> None:
         self.set_search_text(self.state.model.search)
-        for font_id, enabled in self.state.model.enabled_fonts.items():
+        for font_id in self._offered_font_ids:
+            enabled = self.state.model.enabled_fonts.get(font_id, True)
             self.set_font_selected(font_id, enabled)
         self.set_layer_value(self.state.model.layer)
         if self.layer_choice.GetSelection() == wx.NOT_FOUND and self.layer_choice.GetCount() > 0:
@@ -82,9 +117,10 @@ class KicandyDialog(IconPickerDialog):
         self.set_font_size_mm(self.state.model.font_size_mm)
 
     def _persist_state(self) -> None:
-        enabled_map: dict[str, bool] = {
-            font_id: font_id in self.get_enabled_fonts() for font_id, _ in FONT_CHOICES
-        }
+        enabled_values = set(self.get_enabled_fonts())
+        enabled_map = dict(self.state.model.enabled_fonts)
+        for font_id in self._offered_font_ids:
+            enabled_map[font_id] = font_id in enabled_values
         layer = self.get_layer_value() or BoardLayer.BL_F_SilkS
         self.state.update(
             search=self.search_ctrl.GetValue(),
@@ -94,6 +130,21 @@ class KicandyDialog(IconPickerDialog):
         )
 
     def _refresh_icons(self) -> None:
+        if not self._offered_font_ids:
+            self.set_rows([])
+            detail_parts: list[str] = []
+            if self._font_detection.missing_fonts:
+                detail_parts.append(
+                    "Missing fonts: " + ", ".join(self._font_detection.missing_fonts)
+                )
+            if self._font_detection.failed_fonts:
+                detail_parts.append(
+                    "Metadata unavailable: " + ", ".join(self._font_detection.failed_fonts)
+                )
+            detail_suffix = f" ({' | '.join(detail_parts)})" if detail_parts else ""
+            self.set_status(f"Install supported icon fonts to browse icons{detail_suffix}")
+            return
+
         enabled_fonts = self.get_enabled_fonts()
         if not enabled_fonts:
             self.set_rows([])
