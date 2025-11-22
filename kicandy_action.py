@@ -73,8 +73,14 @@ class KicandyDialog(IconPickerDialog):
             (font.identifier, f"{font.display_name} ({font.style_label})")
             for font in detection.offered_fonts
         ]
+        font_weights = {font.identifier: font.available_weights for font in detection.offered_fonts}
 
-        super().__init__(fonts=font_choices, layers=LAYER_CHOICES, parent=None)
+        super().__init__(
+            fonts=font_choices,
+            layers=LAYER_CHOICES,
+            font_weights=font_weights,
+            parent=None,
+        )
 
         self.kicad = KiCad()
         self.board = self.kicad.get_board()
@@ -107,6 +113,7 @@ class KicandyDialog(IconPickerDialog):
 
     # --- Internal helpers ---------------------------------------------------
     def _restore_state(self) -> None:
+        self.set_font_weight(self.state.model.font_weight)
         self.set_search_text(self.state.model.search)
         for font_id in self._offered_font_ids:
             enabled = self.state.model.enabled_fonts.get(font_id, True)
@@ -127,6 +134,7 @@ class KicandyDialog(IconPickerDialog):
             layer=layer,
             enabled_fonts=enabled_map,
             font_size_mm=self.get_font_size_mm(),
+            font_weight=self.get_font_weight(),
         )
 
     def _refresh_icons(self) -> None:
@@ -164,6 +172,7 @@ class KicandyDialog(IconPickerDialog):
 
         rows = [
             IconListRow(
+                font_id=glyph.font_id,
                 glyph=glyph.character,
                 name=glyph.name.replace("_", " "),
                 font_label=glyph.font_label,

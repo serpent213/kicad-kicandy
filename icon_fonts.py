@@ -9,6 +9,7 @@ import ssl
 import subprocess
 import tempfile
 from abc import ABC, abstractmethod
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.error import HTTPError, URLError
@@ -25,6 +26,52 @@ class IconFontFile:
     format: str
 
 
+FONT_WEIGHT_NAMES: tuple[str, ...] = (
+    "Thin",
+    "ExtraLight",
+    "Light",
+    "Regular",
+    "Medium",
+    "Semibold",
+    "Bold",
+)
+
+DEFAULT_FONT_WEIGHT = "Regular"
+_FONT_WEIGHT_INDEX = {name: index for index, name in enumerate(FONT_WEIGHT_NAMES, start=1)}
+
+
+def weight_name_for_position(position: int) -> str:
+    clamped = max(1, min(len(FONT_WEIGHT_NAMES), position))
+    return FONT_WEIGHT_NAMES[clamped - 1]
+
+
+def weight_position_for_name(name: str) -> int:
+    return _FONT_WEIGHT_INDEX.get(name, _FONT_WEIGHT_INDEX[DEFAULT_FONT_WEIGHT])
+
+
+def resolve_weight_choice(desired: str, available: Sequence[str]) -> str:
+    desired_pos = weight_position_for_name(desired)
+    best_name = desired
+    best_pos = None
+    best_distance = None
+    for name in available:
+        if name not in _FONT_WEIGHT_INDEX:
+            continue
+        candidate_pos = _FONT_WEIGHT_INDEX[name]
+        distance = abs(candidate_pos - desired_pos)
+        if best_distance is None or distance < best_distance:
+            best_distance = distance
+            best_pos = candidate_pos
+            best_name = name
+            continue
+        if distance == best_distance and best_pos is not None and candidate_pos > best_pos:
+            best_pos = candidate_pos
+            best_name = name
+    if best_distance is None:
+        return desired
+    return best_name
+
+
 @dataclass(frozen=True)
 class IconFont:
     identifier: str
@@ -35,6 +82,7 @@ class IconFont:
     codepoints_resource: str
     font_files: tuple[IconFontFile, ...]
     default_enabled: bool = True
+    available_weights: tuple[str, ...] = (DEFAULT_FONT_WEIGHT,)
 
 
 class IconFontSource(ABC):
@@ -175,6 +223,7 @@ class MaterialSymbolsFontSource(IconFontSource):
                 ),
                 font_files=_font_files("MaterialSymbolsOutlined%5BFILL,GRAD,opsz,wght%5D"),
                 default_enabled=True,
+                available_weights=FONT_WEIGHT_NAMES,
             ),
             IconFont(
                 identifier="material-symbols-rounded",
@@ -188,6 +237,7 @@ class MaterialSymbolsFontSource(IconFontSource):
                 ),
                 font_files=_font_files("MaterialSymbolsRounded%5BFILL,GRAD,opsz,wght%5D"),
                 default_enabled=True,
+                available_weights=FONT_WEIGHT_NAMES,
             ),
             IconFont(
                 identifier="material-symbols-sharp",
@@ -201,6 +251,7 @@ class MaterialSymbolsFontSource(IconFontSource):
                 ),
                 font_files=_font_files("MaterialSymbolsSharp%5BFILL,GRAD,opsz,wght%5D"),
                 default_enabled=True,
+                available_weights=FONT_WEIGHT_NAMES,
             ),
         )
 

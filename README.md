@@ -52,7 +52,7 @@ searchable gallery of icons grouped by font style (Outlined, Rounded, Sharp).
 ## Extending
 
 Icon fonts are defined via `IconFontSource` subclasses in `icon_fonts.py`. Each
-source provides metadata for one family (with optional styles), a
+source provides metadata for one family (with optional weights), a
 `download_codepoints` implementation, and inherits the built-in TTF installer
 logic. Append new sources to `ICON_FONT_SOURCES` and KiCandy will offer them as
 soon as wxPython can see the font family and the codepoints can be cached.

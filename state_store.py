@@ -9,7 +9,7 @@ from pathlib import Path
 from kipy.board_types import BoardLayer
 
 import settings
-from icon_fonts import ICON_FONTS
+from icon_fonts import DEFAULT_FONT_WEIGHT, FONT_WEIGHT_NAMES, ICON_FONTS
 
 
 @dataclass
@@ -20,6 +20,7 @@ class DialogState:
         default_factory=lambda: {font.identifier: font.default_enabled for font in ICON_FONTS}
     )
     font_size_mm: int = settings.DEFAULT_FONT_SIZE_MM
+    font_weight: str = DEFAULT_FONT_WEIGHT
 
 
 class PluginState:
@@ -54,6 +55,10 @@ class PluginState:
             )
             self.model.font_size_mm = clamped
 
+        stored_weight = data.get("font_weight")
+        if isinstance(stored_weight, str) and stored_weight in FONT_WEIGHT_NAMES:
+            self.model.font_weight = stored_weight
+
     def save(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         payload = {
@@ -61,6 +66,7 @@ class PluginState:
             "layer": self.model.layer,
             "enabled_fonts": self.model.enabled_fonts,
             "font_size_mm": self.model.font_size_mm,
+            "font_weight": self.model.font_weight,
         }
         self.path.write_text(json.dumps(payload, indent=2))
 
@@ -71,6 +77,7 @@ class PluginState:
         layer: int,
         enabled_fonts: dict[str, bool],
         font_size_mm: int,
+        font_weight: str,
     ) -> None:
         self.model.search = search
         self.model.layer = layer
@@ -80,4 +87,8 @@ class PluginState:
             min(settings.FONT_SIZE_MAX_MM, font_size_mm),
         )
         self.model.font_size_mm = clamped_size
+        if font_weight in FONT_WEIGHT_NAMES:
+            self.model.font_weight = font_weight
+        else:
+            self.model.font_weight = DEFAULT_FONT_WEIGHT
         self.save()

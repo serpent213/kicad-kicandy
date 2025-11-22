@@ -1,22 +1,41 @@
 from __future__ import annotations
 
 import math
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 
 import wx
 import wx.grid as grid
 
 import settings
+from icon_fonts import (
+    DEFAULT_FONT_WEIGHT,
+    FONT_WEIGHT_NAMES,
+    resolve_weight_choice,
+    weight_name_for_position,
+    weight_position_for_name,
+)
 
 
 @dataclass
 class IconListRow:
+    font_id: str
     glyph: str
     name: str
     font_label: str
     font_family: str
     payload: object
+
+
+WX_WEIGHT_MAP: dict[str, int] = {
+    "Thin": wx.FONTWEIGHT_THIN,
+    "ExtraLight": wx.FONTWEIGHT_EXTRALIGHT,
+    "Light": wx.FONTWEIGHT_LIGHT,
+    "Regular": wx.FONTWEIGHT_NORMAL,
+    "Medium": wx.FONTWEIGHT_MEDIUM,
+    "Semibold": wx.FONTWEIGHT_SEMIBOLD,
+    "Bold": wx.FONTWEIGHT_BOLD,
+}
 
 
 class IconGridTable(grid.GridTableBase):
@@ -115,7 +134,7 @@ class IconGridTable(grid.GridTableBase):
 
 
 class IconCellRenderer(grid.GridCellRenderer):
-    def __init__(self, font_lookup: Callable[[str, int], wx.Font | None]) -> None:
+    def __init__(self, font_lookup: Callable[[str, str, int], wx.Font | None]) -> None:
         super().__init__()
         self._font_lookup = font_lookup
 
@@ -145,7 +164,7 @@ class IconCellRenderer(grid.GridCellRenderer):
         if item is None:
             return
         font_size = max(24, int(rect.Height * 0.7))
-        font = self._font_lookup(item.font_family, font_size)
+        font = self._font_lookup(item.font_id, item.font_family, font_size)
         if font is None:
             font = wx.Font(wx.FontInfo(font_size))
         dc.SetFont(font)
@@ -171,7 +190,7 @@ class IconGrid(grid.Grid):
     def __init__(
         self,
         parent: wx.Window,
-        font_lookup: Callable[[str, int], wx.Font | None],
+        font_lookup: Callable[[str, str, int], wx.Font | None],
         min_cell: int = settings.ICON_GRID_MIN_CELL_PX,
     ) -> None:
         super().__init__(parent, style=wx.BORDER_THEME)
@@ -257,6 +276,8 @@ class IconPickerDialog(wx.Dialog):
         self,
         fonts: Sequence[tuple[str, str]],
         layers: Sequence[tuple[str, object]],
+        *,
+        font_weights: Mapping[str, Sequence[str]] | None = None,
         parent: wx.Window | None = None,
     ) -> None:
         super().__init__(
@@ -268,7 +289,18 @@ class IconPickerDialog(wx.Dialog):
         self.fonts = list(fonts)
         self.layers = list(layers)
         self._font_checkboxes: dict[str, wx.CheckBox] = {}
-        self._font_render_map: dict[tuple[str, int], wx.Font] = {}
+        self._font_render_map: dict[tuple[str, str, int, str], wx.Font] = {}
+        resolved_weights = font_weights or {}
+        self._font_weights: dict[str, tuple[str, ...]] = {}
+        for identifier, _ in self.fonts:
+            available = tuple(
+                weight
+                for weight in resolved_weights.get(identifier, (DEFAULT_FONT_WEIGHT,))
+                if weight in FONT_WEIGHT_NAMES
+            )
+            if not available:
+                available = (DEFAULT_FONT_WEIGHT,)
+            self._font_weights[identifier] = available
         self._default_preview_font = wx.Font(wx.FontInfo(96))
 
         self._build_ui()
@@ -295,10 +327,30 @@ class IconPickerDialog(wx.Dialog):
         font_sizer.Add(self.font_grid, 1, wx.ALL | wx.EXPAND, 5)
         root_sizer.Add(font_sizer, 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 5)
 
+        # Weight selector
+        weight_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        self.weight_label = wx.StaticText(self, label="Weight")
+        weight_sizer.Add(self.weight_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.LEFT | wx.RIGHT, 5)
+        self.weight_slider = wx.Slider(
+            self,
+            value=weight_position_for_name(DEFAULT_FONT_WEIGHT),
+            minValue=1,
+            maxValue=len(FONT_WEIGHT_NAMES),
+            style=wx.SL_HORIZONTAL,
+        )
+        self.weight_slider.SetMinSize(wx.Size(200, -1))
+        self.weight_slider.SetTickFreq(1)
+        self.weight_slider.SetLineSize(1)
+        self.weight_slider.SetPageSize(1)
+        weight_sizer.Add(self.weight_slider, 1, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
+        self.weight_value = wx.StaticText(self, label="")
+        weight_sizer.Add(self.weight_value, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
+        root_sizer.Add(weight_sizer, 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 5)
+
         # Icon list + preview panel
         content_sizer = wx.BoxSizer(wx.HORIZONTAL)
 
-        self.icon_grid = IconGrid(self, self._get_font_for_family)
+        self.icon_grid = IconGrid(self, self._get_font_for_id)
         content_sizer.Add(self.icon_grid, 2, wx.EXPAND | wx.ALL, 5)
 
         preview_box = wx.StaticBox(self, label="Preview")
@@ -387,10 +439,12 @@ class IconPickerDialog(wx.Dialog):
         self.icon_grid.Bind(grid.EVT_GRID_CELL_LEFT_DCLICK, self._handle_icon_activated)
         self.add_button.Bind(wx.EVT_BUTTON, self._handle_add)
         self.font_size_slider.Bind(wx.EVT_SLIDER, self._handle_font_size_change)
+        self.weight_slider.Bind(wx.EVT_SLIDER, self._handle_weight_change)
         self.Bind(wx.EVT_CLOSE, self._handle_close)
         self.Bind(wx.EVT_SIZE, self._handle_dialog_resize)
 
         self._update_font_size_label(self.font_size_slider.GetValue())
+        self._update_weight_label(self.weight_slider.GetValue())
 
     def _populate_fonts(self) -> None:
         for identifier, label in self.fonts:
@@ -433,6 +487,13 @@ class IconPickerDialog(wx.Dialog):
     def _handle_font_size_change(self, _: wx.CommandEvent) -> None:
         self._update_font_size_label(self.font_size_slider.GetValue())
 
+    def _handle_weight_change(self, _: wx.CommandEvent) -> None:
+        value = self.weight_slider.GetValue()
+        self._update_weight_label(value)
+        self.icon_grid.ForceRefresh()
+        self._update_preview(self.get_selected_row())
+        self.on_weight_changed(weight_name_for_position(value))
+
     def _update_icon_activated(self) -> None:
         row = self.get_selected_row()
         self.add_button.Enable(row is not None)
@@ -446,7 +507,7 @@ class IconPickerDialog(wx.Dialog):
             self._refresh_preview_layout()
             return
 
-        preview_font = self._get_font_for_family(row.font_family, 120)
+        preview_font = self._get_font_for_id(row.font_id, row.font_family, 120)
         if preview_font is None:
             preview_font = self._default_preview_font
         self.preview_glyph.SetFont(preview_font)
@@ -468,6 +529,9 @@ class IconPickerDialog(wx.Dialog):
         pass
 
     def on_close_requested(self) -> None:  # pragma: no cover - virtual
+        pass
+
+    def on_weight_changed(self, weight_name: str) -> None:  # pragma: no cover - virtual
         pass
 
     # --- Helpers for controller code -----------------------------------------
@@ -518,13 +582,27 @@ class IconPickerDialog(wx.Dialog):
     def get_font_size_mm(self) -> int:
         return self.font_size_slider.GetValue()
 
-    def _get_font_for_family(self, family: str, size: int = 24) -> wx.Font | None:
-        key = (family, size)
+    def set_font_weight(self, weight_name: str) -> None:
+        value = weight_position_for_name(weight_name)
+        self.weight_slider.SetValue(value)
+        self._update_weight_label(value)
+
+    def get_font_weight(self) -> str:
+        return weight_name_for_position(self.weight_slider.GetValue())
+
+    def get_resolved_font_weight(self, font_id: str) -> str:
+        available = self._font_weights.get(font_id, (DEFAULT_FONT_WEIGHT,))
+        return resolve_weight_choice(self.get_font_weight(), available)
+
+    def _get_font_for_id(self, font_id: str, family: str, size: int = 24) -> wx.Font | None:
+        resolved_weight = self.get_resolved_font_weight(font_id)
+        key = (font_id, family, size, resolved_weight)
         if key not in self._font_render_map:
-            info = wx.FontInfo(size).FaceName(family)
+            weight_value = WX_WEIGHT_MAP.get(resolved_weight, wx.FONTWEIGHT_NORMAL)
+            info = wx.FontInfo(size).FaceName(family).Weight(weight_value)
             font = wx.Font(info)
             if not font.IsOk():
-                font = wx.Font(wx.FontInfo(size))
+                font = wx.Font(wx.FontInfo(size).Weight(weight_value))
             self._font_render_map[key] = font
         return self._font_render_map[key]
 
@@ -538,3 +616,7 @@ class IconPickerDialog(wx.Dialog):
 
     def _update_font_size_label(self, value: int) -> None:
         self.font_size_value.SetLabel(f"{value} mm")
+
+    def _update_weight_label(self, value: int) -> None:
+        name = weight_name_for_position(value)
+        self.weight_value.SetLabel(f"{value} – {name}")
