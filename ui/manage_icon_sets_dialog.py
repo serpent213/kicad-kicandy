@@ -56,8 +56,17 @@ class ManageIconSetsDialog(wx.Dialog):
         self.list_ctrl.AppendTextColumn("Glyphs", width=70)
         self.list_ctrl.AppendTextColumn("Website", width=180)
         self.list_ctrl.AppendTextColumn("License", width=140)
+
+        # Multi-layered event binding for cross-platform checkbox support
+        # EVT_DATAVIEW_ITEM_VALUE_CHANGED works reliably on Windows/Linux
         self.list_ctrl.Bind(dv.EVT_DATAVIEW_ITEM_VALUE_CHANGED, self._handle_item_changed)
+        # EVT_DATAVIEW_SELECTION_CHANGED catches row switches on all platforms
+        self.list_ctrl.Bind(dv.EVT_DATAVIEW_SELECTION_CHANGED, self._handle_selection_changed)
+        # EVT_LEFT_DOWN with delayed sync is the macOS fallback for same-row toggles
+        self.list_ctrl.Bind(wx.EVT_LEFT_DOWN, self._handle_list_click)
+        # EVT_DATAVIEW_ITEM_ACTIVATED for launching website URLs
         self.list_ctrl.Bind(dv.EVT_DATAVIEW_ITEM_ACTIVATED, self._handle_item_activated)
+
         root.Add(self.list_ctrl, 1, wx.LEFT | wx.RIGHT | wx.BOTTOM | wx.EXPAND, 10)
 
         controls = wx.BoxSizer(wx.HORIZONTAL)
@@ -107,7 +116,7 @@ class ManageIconSetsDialog(wx.Dialog):
 
     def _font_installed_label(self, row: FontStatusRow) -> str:
         if not row.wx_available:
-            return "no"
+            return "No"
         if row.uninstallable:
             return "User"
         return "System"
@@ -125,11 +134,27 @@ class ManageIconSetsDialog(wx.Dialog):
     def get_selected_ids(self) -> list[str]:
         return list(self._selected_ids)
 
+    def _sync_checkbox_states(self) -> None:
+        """
+        Poll checkbox states directly from list control and sync with internal state.
+        This is necessary on macOS where toggle column events are unreliable.
+        """
+        new_selected = set()
+        for i, row in enumerate(self._rows):
+            is_checked = self.list_ctrl.GetValue(i, 0)
+            if is_checked:
+                new_selected.add(row.identifier)
+
+        if new_selected != self._selected_ids:
+            self._selected_ids = new_selected
+            self._update_button_states()
+
     def _update_button_states(self) -> None:
         if self._busy:
             self.install_button.Disable()
             self.uninstall_button.Disable()
             return
+
         install_ready = False
         uninstall_ready = False
         for row in self._rows:
@@ -139,22 +164,43 @@ class ManageIconSetsDialog(wx.Dialog):
                 install_ready = True
             if row.uninstallable:
                 uninstall_ready = True
+
         self.install_button.Enable(install_ready)
         self.uninstall_button.Enable(uninstall_ready)
 
     def _handle_item_changed(self, event: dv.DataViewEvent) -> None:
+        """Handle checkbox value changes on platforms where the event fires reliably."""
         row_index = event.GetRow()
         column = event.GetColumn()
         if column != 0 or row_index < 0 or row_index >= len(self._rows):
             return
+
         identifier = self._rows[row_index].identifier
-        if event.GetValue():
+        is_checked = self.list_ctrl.GetValue(row_index, 0)
+        if is_checked:
             self._selected_ids.add(identifier)
         else:
             self._selected_ids.discard(identifier)
         self._update_button_states()
 
+    def _handle_selection_changed(self, event: dv.DataViewEvent) -> None:
+        """
+        Handle row selection changes.
+        On macOS this catches checkbox clicks when switching between rows.
+        """
+        self._sync_checkbox_states()
+
+    def _handle_list_click(self, event: wx.MouseEvent) -> None:
+        """
+        Handle mouse clicks on the list control.
+        On macOS this is the fallback for detecting same-row checkbox toggles.
+        Uses CallLater to allow the native control to update before reading state.
+        """
+        event.Skip()
+        wx.CallLater(250, self._sync_checkbox_states)
+
     def _handle_item_activated(self, event: dv.DataViewEvent) -> None:
+        """Handle double-click on website column to open URL in browser."""
         row_index = event.GetRow()
         column = event.GetColumn()
         if column != 6:
