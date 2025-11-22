@@ -29,6 +29,7 @@ searchable gallery of icons grouped by font style (Outlined, Rounded, Sharp).
   the codepoint metadata is downloaded automatically.
 
   Download TTFs from https://github.com/google/material-design-icons/tree/master/variablefont
+  and install on macOS using *Font Book*, for example.
 - Codepoint files are cached under `cache/` within the plugin directory. Delete
   the folder if you need to force a refresh.
 - Dialog state is stored in `cache/kicandy_state.json` (or the KiCad plugin
