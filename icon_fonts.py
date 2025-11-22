@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 from urllib.error import HTTPError, URLError
+from urllib.parse import unquote
 from urllib.request import Request, urlopen
 
 import certifi
@@ -265,7 +266,15 @@ def get_font_install_paths(font: IconFont, destination: Path | None = None) -> l
     for font_file in font.font_files:
         if font_file.format.lower() != "ttf":
             continue
-        paths.append(destination / Path(font_file.url).name)
+        filename = Path(font_file.url).name
+        variants = [filename]
+        decoded = unquote(filename)
+        if decoded != filename:
+            variants.append(decoded)
+        for candidate in variants:
+            candidate_path = destination / candidate
+            if candidate_path not in paths:
+                paths.append(candidate_path)
     return paths
 
 

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import webbrowser
 from collections.abc import Sequence
 from typing import Callable
 
@@ -51,11 +50,8 @@ class ManageIconSetsDialog(wx.Dialog):
         )
         self.list_ctrl.AppendToggleColumn("Select", width=70)
         self.list_ctrl.AppendTextColumn("Family", width=200)
-        self.list_ctrl.AppendTextColumn("Icon Set", width=200)
-        self.list_ctrl.AppendTextColumn("In Picker", width=80)
-        self.list_ctrl.AppendTextColumn("TTF", width=90)
-        self.list_ctrl.AppendTextColumn("Codepoints", width=110)
-        self.list_ctrl.AppendTextColumn("wx Font", width=90)
+        self.list_ctrl.AppendTextColumn("Font installed", width=120)
+        self.list_ctrl.AppendTextColumn("Font loaded", width=110)
         self.list_ctrl.AppendTextColumn("Weights", width=70)
         self.list_ctrl.AppendTextColumn("Glyphs", width=70)
         self.list_ctrl.AppendTextColumn("Website", width=180)
@@ -91,29 +87,30 @@ class ManageIconSetsDialog(wx.Dialog):
         self.list_ctrl.DeleteAllItems()
         for row in self._rows:
             is_selected = row.identifier in self._selected_ids
-            picker_status = "Yes" if not row.deleted else "No"
-            ttf_status = "Installed" if row.is_installed else "Missing"
-            cache_status = "Cached" if row.codepoints_cached else "Missing"
+            ttf_status = self._font_installed_label(row)
             wx_status = "Yes" if row.wx_available else "No"
             website = row.info_url or "-"
             license_text = row.license_text or "-"
-            icon_label = f"{row.display_name} ({row.style_label})"
             self.list_ctrl.AppendItem(
                 [
                     is_selected,
                     row.family,
-                    icon_label,
-                    picker_status,
                     ttf_status,
-                    cache_status,
                     wx_status,
                     str(row.weights_count),
-                    str(row.glyph_count),
+                    "?" if not row.wx_available else str(row.glyph_count),
                     website,
                     license_text,
                 ]
             )
         self._update_button_states()
+
+    def _font_installed_label(self, row: FontStatusRow) -> str:
+        if not row.wx_available:
+            return "no"
+        if row.uninstallable:
+            return "User"
+        return "System"
 
     def set_busy(self, busy: bool, message: str = "") -> None:
         self._busy = busy
@@ -150,22 +147,23 @@ class ManageIconSetsDialog(wx.Dialog):
         column = event.GetColumn()
         if column != 0 or row_index < 0 or row_index >= len(self._rows):
             return
-        if event.GetValue() and self._rows[row_index].identifier not in self._selected_ids:
-            self._selected_ids.add(self._rows[row_index].identifier)
-        elif not event.GetValue() and self._rows[row_index].identifier in self._selected_ids:
-            self._selected_ids.remove(self._rows[row_index].identifier)
+        identifier = self._rows[row_index].identifier
+        if event.GetValue():
+            self._selected_ids.add(identifier)
+        else:
+            self._selected_ids.discard(identifier)
         self._update_button_states()
 
     def _handle_item_activated(self, event: dv.DataViewEvent) -> None:
         row_index = event.GetRow()
         column = event.GetColumn()
-        if column != 9:
+        if column != 6:
             return
         if row_index < 0 or row_index >= len(self._rows):
             return
         row = self._rows[row_index]
         if row.info_url:
-            webbrowser.open(row.info_url)
+            wx.LaunchDefaultBrowser(row.info_url)
 
     def _handle_install(self, _: wx.CommandEvent) -> None:
         if self._busy:

@@ -77,8 +77,8 @@ class FontManager:
         for font in self._font_map.values():
             install_paths = get_font_install_paths(font)
             installable = bool(install_paths)
-            is_installed = bool(install_paths) and all(path.exists() for path in install_paths)
-            uninstallable = bool(install_paths) and any(path.exists() for path in install_paths)
+            installed = any(path.exists() for path in install_paths)
+            uninstallable = bool(install_paths) and installed
             codepoints_cached = self.repository.has_cached_font(font.identifier)
             glyph_count = (
                 self.repository.cached_glyph_count(font.identifier) if codepoints_cached else 0
@@ -91,7 +91,7 @@ class FontManager:
                     style_label=font.style_label,
                     weights_count=len(font.available_weights),
                     glyph_count=glyph_count,
-                    is_installed=is_installed,
+                    is_installed=installed,
                     codepoints_cached=codepoints_cached,
                     wx_available=enumerator.IsValidFacename(font.font_family)
                     if enumerator is not None
