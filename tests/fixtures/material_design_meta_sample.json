@@ -1,0 +1,20 @@
+[
+    {
+        "id": "CBFA6722-0EE6-49B4-B5C2-0B177A5523C2",
+        "name": "ab-testing",
+        "codepoint": "F01C9",
+        "deprecated": false
+    },
+    {
+        "id": "5B09B959-4A49-4674-9035-6CFD3D157C3F",
+        "name": "abacus",
+        "codepoint": "F16E0",
+        "deprecated": false
+    },
+    {
+        "id": "7B9FFE09-7710-470D-928C-A4A4769E029D",
+        "name": "calendar-remove-outline",
+        "codepoint": "F00EF",
+        "deprecated": true
+    }
+]

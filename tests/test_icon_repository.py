@@ -128,6 +128,10 @@ class TestIconRepositoryDownload:
         repository = IconRepository(cache_dir=tmp_path)
         assert repository.ensure_font("material-symbols-sharp", refresh=True)
 
+    def test_material_design_icons_regular_can_download(self, tmp_path: Path) -> None:
+        repository = IconRepository(cache_dir=tmp_path)
+        assert repository.ensure_font("material-design-icons-regular", refresh=True)
+
     def test_search_after_download_uses_live_data(self, tmp_path: Path) -> None:
         repository = IconRepository(cache_dir=tmp_path)
         assert repository.ensure_font("material-symbols-rounded", refresh=True)

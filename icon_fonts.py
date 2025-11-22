@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import platform
 import shutil
@@ -118,6 +119,15 @@ def _download_to_path(url: str, destination: Path) -> None:
     try:
         with urlopen(request, timeout=30, context=_SSL_CONTEXT) as response:
             destination.write_bytes(response.read())
+    except (URLError, HTTPError) as exc:  # pragma: no cover - network error path
+        raise RuntimeError(f"Unable to download {url}: {exc}") from exc
+
+
+def _download_text_resource(url: str) -> str:
+    request = Request(url, headers={"User-Agent": _USER_AGENT})
+    try:
+        with urlopen(request, timeout=30, context=_SSL_CONTEXT) as response:
+            return response.read().decode("utf-8")
     except (URLError, HTTPError) as exc:  # pragma: no cover - network error path
         raise RuntimeError(f"Unable to download {url}: {exc}") from exc
 
@@ -262,7 +272,7 @@ class MaterialSymbolsFontSource(IconFontSource):
 
 class MaterialDesignIconsFontSource(IconFontSource):
     identifier = "material-design-icons"
-    install_url = "https://github.com/Templarian/MaterialDesign-Webfont"
+    install_url = "https://github.com/Templarian/MaterialDesign-Font"
 
     def _build_fonts(self) -> tuple[IconFont, ...]:
         return (
@@ -271,15 +281,15 @@ class MaterialDesignIconsFontSource(IconFontSource):
                 source_id=self.identifier,
                 display_name="Material Design Icons",
                 style_label="Regular",
-                font_family="Material Design Icons",
+                font_family="Material Design Icons Desktop",
                 codepoints_resource=(
-                    "https://raw.githubusercontent.com/Templarian/MaterialDesign-Webfont/master/meta.json"
+                    "https://raw.githubusercontent.com/Templarian/MaterialDesign/master/meta.json"
                 ),
                 font_files=(
                     IconFontFile(
                         url=(
-                            "https://github.com/Templarian/MaterialDesign-Webfont/raw/master/fonts/"
-                            "materialdesignicons-webfont.ttf"
+                            "https://raw.githubusercontent.com/Templarian/MaterialDesign-Font/master/"
+                            "MaterialDesignIconsDesktop.ttf"
                         ),
                         format="ttf",
                     ),
@@ -288,10 +298,34 @@ class MaterialDesignIconsFontSource(IconFontSource):
             ),
         )
 
-    def download_codepoints(
-        self, font: IconFont, destination: Path
-    ) -> None:  # pragma: no cover - stub
-        raise RuntimeError("Codepoint conversion for Material Design Icons is not implemented yet.")
+    def download_codepoints(self, font: IconFont, destination: Path) -> None:
+        payload = _download_text_resource(font.codepoints_resource)
+        try:
+            metadata = json.loads(payload)
+        except json.JSONDecodeError as exc:  # pragma: no cover - malformed upstream data
+            raise RuntimeError("Invalid Material Design Icons metadata") from exc
+
+        if not isinstance(metadata, list):
+            raise RuntimeError("Unexpected Material Design Icons metadata structure")
+
+        lines: list[str] = []
+        for entry in metadata:
+            if not isinstance(entry, dict):
+                continue
+            if entry.get("deprecated"):
+                continue
+            name = entry.get("name")
+            codepoint = entry.get("codepoint")
+            if not isinstance(name, str) or not isinstance(codepoint, str):
+                continue
+            if not name or not codepoint:
+                continue
+            lines.append(f"{name} {codepoint}")
+
+        if not lines:
+            raise RuntimeError("No Material Design Icons glyphs were extracted")
+
+        destination.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 class RemixIconFontSource(IconFontSource):
