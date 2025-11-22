@@ -126,6 +126,10 @@ class FontManager:
         if updated != deleted:
             self.state.update_deleted_fonts(updated)
 
+        # Download codepoints for manually installed fonts
+        for font in fonts:
+            self.repository.ensure_font(font.identifier)
+
     def uninstall_fonts(self, font_ids: Sequence[str]) -> list[str]:
         candidates: list[IconFont] = []
         for font_id in font_ids:

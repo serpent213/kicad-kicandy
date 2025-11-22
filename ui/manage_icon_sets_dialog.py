@@ -79,6 +79,10 @@ class ManageIconSetsDialog(wx.Dialog):
         controls.Add(self.uninstall_button, 0, wx.RIGHT, 5)
         controls.AddStretchSpacer()
 
+        self.progress_gauge = wx.Gauge(self, range=100, style=wx.GA_HORIZONTAL)
+        self.progress_gauge.Hide()
+        controls.Add(self.progress_gauge, 1, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 10)
+
         self.status_text = wx.StaticText(self, label="")
         controls.Add(self.status_text, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 10)
 
@@ -234,3 +238,19 @@ class ManageIconSetsDialog(wx.Dialog):
 
     def set_uninstall_handler(self, handler: Callable[[Sequence[str]], None] | None) -> None:
         self._uninstall_handler = handler
+
+    def show_progress(self, total: int) -> None:
+        """Show progress gauge with given total range."""
+        self.progress_gauge.SetRange(total)
+        self.progress_gauge.SetValue(0)
+        self.progress_gauge.Show()
+        self.Layout()
+
+    def update_progress(self, value: int) -> None:
+        """Update progress gauge to given value."""
+        self.progress_gauge.SetValue(value)
+
+    def hide_progress(self) -> None:
+        """Hide progress gauge."""
+        self.progress_gauge.Hide()
+        self.Layout()

@@ -210,9 +210,9 @@ class KicandyDialog(IconPickerDialog):
         def _progress(completed: int, total: int) -> None:
             nonlocal progress_started
             if not progress_started:
-                self.show_status_progress(total)
+                dialog.show_progress(total)
                 progress_started = True
-            self.update_status_progress(completed)
+            dialog.update_progress(completed)
             dialog.set_busy(True, f"Downloading fonts ({completed}/{total})")
             wx.YieldIfNeeded()
 
@@ -223,7 +223,7 @@ class KicandyDialog(IconPickerDialog):
             wx.MessageBox(str(exc), "Font installation failed", parent=self)
         finally:
             if progress_started:
-                self.hide_status_progress()
+                dialog.hide_progress()
             dialog.set_busy(False, "")
             dialog.set_rows(self.font_manager.font_status_rows())
         self._reload_font_detection()
