@@ -326,13 +326,14 @@ class IconPickerDialog(wx.Dialog):
         content_sizer.Add(preview_sizer, 1, wx.EXPAND | wx.ALL, 5)
         root_sizer.Add(content_sizer, 1, wx.EXPAND)
 
-        # Status + layer selection
+        # Status, size and layer selection
         status_row = wx.BoxSizer(wx.HORIZONTAL)
         self.status_text = wx.StaticText(self, label="Ready")
-        status_row.Add(self.status_text, 1, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
+        status_row.Add(self.status_text, 1, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
 
-        font_size_sizer = wx.BoxSizer(wx.VERTICAL)
-        self.font_size_label = wx.StaticText(self, label="")
+        # Font size sizer with proper centering
+        font_size_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        self.font_size_label = wx.StaticText(self, label="Font size")
         self.font_size_slider = wx.Slider(
             self,
             value=self.DEFAULT_FONT_SIZE_MM,
@@ -344,16 +345,26 @@ class IconPickerDialog(wx.Dialog):
         self.font_size_slider.SetTickFreq(1)
         self.font_size_slider.SetLineSize(1)
         self.font_size_slider.SetPageSize(1)
-        font_size_sizer.Add(self.font_size_label, 0, wx.ALIGN_CENTER_HORIZONTAL | wx.BOTTOM, 2)
-        font_size_sizer.Add(self.font_size_slider, 1, wx.EXPAND)
-        status_row.Add(font_size_sizer, 1, wx.EXPAND | wx.ALL, 5)
+        self.font_size_value = wx.StaticText(self, label="")
+
+        # Add with proper spacing and alignment
+        font_size_sizer.Add(self.font_size_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
+        font_size_sizer.Add(self.font_size_slider, 0, wx.ALIGN_BOTTOM | wx.LEFT | wx.RIGHT, 5)
+        font_size_sizer.Add(self.font_size_value, 0, wx.ALIGN_CENTER_VERTICAL | wx.LEFT, 5)
+
+        # Add spacer before font size group to push it right
+        status_row.AddStretchSpacer(1)
+        # Add font size group without proportion - keeps it from stretching
+        status_row.Add(font_size_sizer, 0, wx.ALIGN_CENTER_VERTICAL | wx.LEFT | wx.RIGHT, 5)
+        # Add spacer after font size group to center it
+        status_row.AddStretchSpacer(1)
 
         layer_label = wx.StaticText(self, label="Layer")
         status_row.Add(layer_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.LEFT, 5)
 
         self.layer_choice = wx.Choice(self)
         status_row.Add(self.layer_choice, 0, wx.ALIGN_CENTER_VERTICAL | wx.LEFT, 5)
-        root_sizer.Add(status_row, 0, wx.EXPAND)
+        root_sizer.Add(status_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 5)
 
         # Buttons
         button_row = wx.StdDialogButtonSizer()
@@ -520,4 +531,4 @@ class IconPickerDialog(wx.Dialog):
         self.Layout()
 
     def _update_font_size_label(self, value: int) -> None:
-        self.font_size_label.SetLabel(f"Font size: {value} mm")
+        self.font_size_value.SetLabel(f"{value} mm")
